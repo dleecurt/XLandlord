@@ -1,0 +1,93 @@
+.\" Viola the Landlord - The Landlord's Game for X11
+.\" Copyright (C) 2026 Lee Curtis
+.\" SPDX-License-Identifier: GPL-3.0-or-later
+.TH VIOLA-LANDLORD 6 "2026" "viola-landlord @VERSION@" "Games"
+.SH NAME
+viola-landlord \- The Landlord's Game (Lizzie J. Magie, 1904) against the computer, for X11
+.SH SYNOPSIS
+.B viola-landlord
+.RB [ \-\-version ]
+.RB [ \-\-help ]
+.SH DESCRIPTION
+.B Viola the Landlord
+plays
+.IR "The Landlord's Game" ,
+the board game patented by Lizzie J. Magie in 1904 (US Patent 748,626)
+and the ancestor of Monopoly, by the rules published by the Economic Game
+Company of New York in 1906, including the
+.B Single Tax
+rules. You play against one to three computer players at an
+.BR Easy ,
+.B Medium
+or
+.B Hard
+level. The window is drawn in the style of the Viola web browser: flat
+gray94 panels, raised bevels, black focus boxes, Helvetica menus.
+.PP
+The game ends when a player has drawn his wages five times (three, seven or
+ten can be chosen); the richest player wins, counting cash and 100 for each
+card, house and luxury.
+.SH PLAYING
+On your turn press
+.B Roll Dice
+(Space or Enter). Whenever the rules give you a choice \(em buying a lot,
+bidding, paying the jail fine, using a railroad pass, moving backward
+between the Chances, speculating, buying a luxury \(em a dialog asks.
+Before rolling you may build houses, buy or sell cards, or propose the
+Single Tax from the
+.B Game
+menu. Click a space on the board to read about it.
+.SH KEYS
+.TP
+.BR Space ", " Enter ", " R
+roll the dice
+.TP
+.B B
+build a house
+.TP
+.BR T " / " S
+buy a card from, or sell a card to, a computer player
+.TP
+.B X
+propose the Single Tax
+.TP
+.B F1
+how to play
+.TP
+.B F2
+the standings
+.TP
+.BR PgUp " / " PgDn " / " End
+scroll the record of events
+.TP
+.BR Esc ", " F9 ", " F10
+the menu bar; Alt+G, Alt+O, Alt+H open a menu
+.TP
+.BR Ctrl+N " / " Ctrl+Q
+new game / quit
+.SH FILES
+.TP
+.I $XDG_CONFIG_HOME/viola-landlord/preferences.conf
+(normally
+.IR ~/.config/viola-landlord/preferences.conf )
+your name, the difficulty, the number of computer players, the length of
+the game, the rules, and the options, as
+.I key = value
+lines.
+.SH ENVIRONMENT
+.TP
+.B DISPLAY
+the X display to use.
+.SH NOTES
+The board is drawn after the layout of Magie's 1904 patent drawing; the
+rules are those of the patent and of 1906. Both are in the public domain.
+All pictures are original to this program. The exact order of some spaces,
+the land rent of each lot and the Chance cards are not given by the
+surviving 1906 rule text and are reconstructed; see README.md.
+.SH AUTHOR
+Lee Curtis.
+.SH COPYRIGHT
+Copyright \(co 2026 Lee Curtis. License GPLv3+: GNU GPL version 3 or later
+<https://gnu.org/licenses/gpl.html>. This is free software: you are free to
+change and redistribute it. There is NO WARRANTY, to the extent permitted by
+law.

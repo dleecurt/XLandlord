@@ -1,0 +1,590 @@
+/*
+ * Viola the Landlord - The Landlord's Game for X11
+ * Copyright (C) 2026 Lee Curtis
+ *
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+/* main.c - Viola the Landlord: start-up, the main loop and the commands.
+ *
+ * THE MAIN LOOP
+ *   While a game is on: if it is a computer player's turn, play it (the
+ *   game's hooks redraw the window and pause so the moves can be watched);
+ *   if it is the human's turn, wait for a key, a click or a menu command.
+ *   The Roll command plays the human's turn; dialogs ask his choices. */
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <unistd.h>
+
+#include "ai.h"
+#include "app.h"
+#include "help.h"
+#include "human.h"
+#include "keys.h"
+#include "menubar.h"
+#include "ui.h"
+#include "util.h"
+#include "version.h"
+#include "view.h"
+#include "xwin.h"
+
+App app;
+
+static int quit_requested;
+static int final_shown;
+
+/* ---- for the menus ---- */
+
+int app_can_act(void) { return app.playing && app.human_turn && !app.game.over; }
+int app_can_propose(void) { return app_can_act() && !app.game.single_tax; }
+int app_bids_on(void) { return app.prefs.ask_bids; }
+int app_confirm_on(void) { return app.prefs.confirm_cpu; }
+
+static void redraw(void) { view_draw(); }
+
+/* ---- the game's hooks ---- */
+
+/* Wait `ms`, keeping the window alive; a key or click cuts it short. */
+static void watch(int ms)
+{
+    int k = xw_wait_key(ms);
+    if (k == K_CLOSE) quit_requested = 1;
+    if (k == K_RESIZE) { view_draw(); xw_flush(); }
+}
+
+static int cpu_turn(const Game *g) { return app.playing && !g->over && g->pl[g->cur].cpu; }
+
+static void hook_changed(Game *g)
+{
+    view_scroll_log(0);
+    view_draw();
+    xw_flush();
+    if (cpu_turn(g) && app.cpu_running && !quit_requested) watch(prefs_delay(&app.prefs) / 2);
+}
+
+static void hook_dice(Game *g, int d1, int d2)
+{
+    (void)d1; (void)d2;
+    if (app.prefs.speed == 0 && g->pl[g->cur].cpu) return;
+    for (int i = 1; i <= 6; i++) {
+        app.dice_rolling = i + g->turn_no;
+        view_draw();
+        xw_flush();
+        xw_wait_key(45);
+    }
+    app.dice_rolling = 0;
+    view_draw();
+    xw_flush();
+}
+
+static void hook_chance(Game *g, int p, const char *text)
+{
+    if (g->pl[p].cpu) return;
+    ui_message("Chance", text);
+}
+
+static void hook_pause(Game *g, int p)
+{
+    if (p < 0 || !g->pl[p].cpu || quit_requested) return;
+    view_draw();
+    xw_flush();
+    if (app.prefs.confirm_cpu) {
+        view_set_status("%s has moved. Press a key to go on.", g->pl[p].name);
+        view_draw();
+        xw_flush();
+        int k;
+        do k = xw_next_key(); while (k == K_RESIZE ? (view_draw(), xw_flush(), 1) : 0);
+        if (k == K_CLOSE) quit_requested = 1;
+    } else {
+        watch(prefs_delay(&app.prefs));
+    }
+}
+
+/* ---- starting a game ---- */
+
+static unsigned long time_seed(void)
+{
+    return (unsigned long)time(NULL) * 2654435761UL ^ (unsigned long)getpid();
+}
+
+static const char *const cpu_names[] = { "Lord Blueblood", "Mr. D. F. Hogg", "Mrs. Soakum" };
+
+static void start_game(void)
+{
+    GameSettings s;
+    memset(&s, 0, sizeof s);
+    s.nplayers = 1 + CLAMP(app.prefs.opponents, 1, 3);
+    s.advanced = app.prefs.advanced;
+    s.end_wages = app.prefs.end_wages;
+    s.seed = (unsigned long)time_seed();
+    copy_str(s.names[0], NAME_LEN, app.prefs.name);
+    for (int p = 1; p < s.nplayers; p++) {
+        copy_str(s.names[p], NAME_LEN, cpu_names[p - 1]);
+        s.difficulty[p] = app.prefs.difficulty;
+    }
+    game_new(&app.game, &s);
+    Game *g = &app.game;
+    g->hooks.changed = hook_changed;
+    g->hooks.dice = hook_dice;
+    g->hooks.chance = hook_chance;
+    g->hooks.pause = hook_pause;
+    game_set_decider(g, 0, &human_decider);
+    for (int p = 1; p < g->nplayers; p++) game_set_decider(g, p, &ai_decider);
+    app.playing = 1;
+    app.human_turn = 0;
+    app.highlight = -1;
+    final_shown = 0;
+    game_log(g, "A new game: %s against %d %s computer player%s; the game ends at %d wages%s.",
+             g->pl[0].name, g->nplayers - 1,
+             app.prefs.difficulty == DIFF_EASY ? "easy" : app.prefs.difficulty == DIFF_HARD ? "hard" : "medium",
+             g->nplayers > 2 ? "s" : "", g->end_wages, g->advanced ? ", advanced rules" : "");
+    view_set_status("The deal.");
+    app.cpu_running = 1;
+    game_deal(g);
+    app.cpu_running = 0;
+}
+
+/* The settings form. Returns 1 if confirmed. */
+static int settings_form(const char *title, const char *ok)
+{
+    static const char *const diffs[] = { "Easy", "Medium", "Hard" };
+    static const char *const opps[] = { "1", "2", "3" };
+    static const char *const lens[] = { "3", "5", "7", "10" };
+    static const char *const rules[] = { "Standard", "Advanced" };
+    static const int len_val[] = { 3, 5, 7, 10 };
+    UiRow rows[] = {
+        { "Difficulty", diffs, 3 },
+        { "Computer players", opps, 3 },
+        { "Game ends at wages", lens, 4 },
+        { "Rules", rules, 2 },
+    };
+    int sel[4] = { app.prefs.difficulty, app.prefs.opponents - 1, 1, app.prefs.advanced };
+    for (int i = 0; i < 4; i++) if (len_val[i] == app.prefs.end_wages) sel[2] = i;
+    if (!ui_form(title,
+                 "The 1906 rules end the game when a player has drawn his wages five times. The advanced rules "
+                 "double taxes and land rents as houses go up.",
+                 rows, 4, sel, ok))
+        return 0;
+    app.prefs.difficulty = sel[0];
+    app.prefs.opponents = sel[1] + 1;
+    app.prefs.end_wages = len_val[sel[2]];
+    app.prefs.advanced = sel[3];
+    prefs_save(&app.prefs);
+    return 1;
+}
+
+static void cmd_new_game(void)
+{
+    if (app.playing && !app.game.over &&
+        !ui_yes_no("New Game", "Abandon the game in progress?", 0))
+        return;
+    if (!settings_form("New Game", "&Start")) return;
+    start_game();
+}
+
+static void cmd_settings(void)
+{
+    if (!settings_form("Game Settings", "OK")) return;
+    char name[32];
+    copy_str(name, sizeof name, app.prefs.name);
+    if (ui_prompt("Your Name", "The name you play under:", name, sizeof name) && name[0]) {
+        copy_str(app.prefs.name, sizeof app.prefs.name, name);
+        prefs_save(&app.prefs);
+    }
+    if (app.playing) ui_message("Game Settings", "The new settings take effect in the next game.");
+}
+
+static void cmd_speed(void)
+{
+    static const char *const items[] = { "Fast", "Normal", "Slow" };
+    int i = ui_choose("Computer Speed", "How long to pause after each computer move:", items, 3, app.prefs.speed);
+    if (i >= 0) { app.prefs.speed = i; prefs_save(&app.prefs); }
+}
+
+/* ---- the human's own business ---- */
+
+static void cmd_build(void)
+{
+    Game *g = &app.game;
+    for (;;) {
+        int sps[NSPACES], n = 0;
+        char items[NSPACES][120];
+        const char *ptr[NSPACES];
+        for (int sp = 0; sp < NSPACES; sp++) {
+            if (!game_can_build(g, 0, sp)) continue;
+            snprintf(items[n], sizeof items[n], "%s  -  %d house%s now, rent $%d + $%d", board[sp].name,
+                     g->houses[sp], g->houses[sp] == 1 ? "" : "s", game_land_rent(g, sp), 10 * g->houses[sp]);
+            ptr[n] = items[n];
+            sps[n++] = sp;
+        }
+        if (!n) {
+            ui_message("Build a House", g->single_tax ? "There is no lot you can build on."
+                                                      : "You own no lot to build on. Buy lots first.");
+            return;
+        }
+        char note[200];
+        snprintf(note, sizeof note, "A house costs $100, counts 100 at the end, and adds $10 to the rent. "
+                 "You have $%d.", g->pl[0].cash);
+        int i = ui_choose("Build a House (Rule 14)", note, ptr, n, 0);
+        if (i < 0) return;
+        const char *err = game_build(g, 0, sps[i]);
+        if (err) { ui_message("Build a House", err); return; }
+    }
+}
+
+static void cmd_trade_buy(void)
+{
+    Game *g = &app.game;
+    int sps[NSPACES], n = 0;
+    char items[NSPACES][120];
+    const char *ptr[NSPACES];
+    for (int sp = 0; sp < NSPACES; sp++) {
+        int o = g->owner[sp];
+        if (o <= 0 || (g->single_tax && board[sp].type == T_LOT) || (g->houses[sp] && !g->single_tax)) continue;
+        snprintf(items[n], sizeof items[n], "%s  (%s)", board[sp].name, g->pl[o].name);
+        ptr[n] = items[n];
+        sps[n++] = sp;
+    }
+    if (!n) { ui_message("Buy a Card", "The computer players hold no card they could sell you."); return; }
+    int i = ui_choose("Buy a Card from a Player", "Which card would you like to buy?", ptr, n, 0);
+    if (i < 0) return;
+    int sp = sps[i], o = g->owner[sp];
+    int offer = board[sp].price;
+    char note[300];
+    snprintf(note, sizeof note, "How much do you offer %s for %s? (Sale price $%d; you have $%d.)",
+             g->pl[o].name, board[sp].name, board[sp].price, g->pl[0].cash);
+    if (!ui_number("Your Offer", note, &offer) || offer <= 0) return;
+    if (offer > g->pl[0].cash) { ui_message("Your Offer", "You have not that much money."); return; }
+    if (ai_accepts_sale(g, o, sp, offer)) {
+        game_trade(g, o, 0, sp, offer);
+        char msg[200];
+        snprintf(msg, sizeof msg, "%s accepts: %s is yours for $%d.", g->pl[o].name, board[sp].name, offer);
+        ui_message("Sold", msg);
+    } else {
+        char msg[200];
+        snprintf(msg, sizeof msg, "%s declines your offer of $%d for %s.", g->pl[o].name, offer, board[sp].name);
+        ui_message("Declined", msg);
+    }
+}
+
+static void cmd_trade_sell(void)
+{
+    Game *g = &app.game;
+    int sps[NSPACES], n = 0;
+    char items[NSPACES][120];
+    const char *ptr[NSPACES];
+    for (int sp = 0; sp < NSPACES; sp++) {
+        if (g->owner[sp] != 0 || (g->single_tax && board[sp].type == T_LOT) || (g->houses[sp] && !g->single_tax)) continue;
+        snprintf(items[n], sizeof items[n], "%s  (sale price $%d)", board[sp].name, board[sp].price);
+        ptr[n] = items[n];
+        sps[n++] = sp;
+    }
+    if (!n) { ui_message("Sell a Card", "You hold no card you can sell (lots with houses must be cleared first)."); return; }
+    int i = ui_choose("Sell a Card to a Player", "Which card would you like to sell?", ptr, n, 0);
+    if (i < 0) return;
+    int sp = sps[i], best = -1, best_price = 0;
+    for (int q = 1; q < g->nplayers; q++) {
+        int o = ai_offer_for(g, q, sp);
+        if (o > best_price) { best_price = o; best = q; }
+    }
+    if (best < 0) { ui_message("No Offers", "Nobody will make you an offer for that card just now."); return; }
+    char text[300];
+    snprintf(text, sizeof text, "%s offers you $%d for %s. Accept?", g->pl[best].name, best_price, board[sp].name);
+    if (ui_yes_no("An Offer", text, 0)) game_trade(g, 0, best, sp, best_price);
+}
+
+static void cmd_sell_pack(void)
+{
+    Game *g = &app.game;
+    char note[200];
+    snprintf(note, sizeof note, "Cards go back to the pack for half their sale price, houses to the bank for "
+             "$50, or to a computer player at his offer. You have $%d.", g->pl[0].cash);
+    while (human_sell_menu(g, 0, "Sell", note, 0)) {
+        snprintf(note, sizeof note, "Sell anything else? You have $%d.", g->pl[0].cash);
+    }
+}
+
+static void cmd_single_tax(void)
+{
+    if (!ui_yes_no("The Single Tax",
+                   "Propose the Single Tax? It needs one more vote than yours. Under it land rent goes to the "
+                   "Public Treasury and title deeds to lots are worth nothing; the treasury frees the utilities, "
+                   "builds colleges and raises wages.", 0))
+        return;
+    app.cpu_running = 0;
+    if (!game_propose_single_tax(&app.game, 0)) ui_message("The Single Tax", "The Single Tax is defeated.");
+    else ui_message("The Single Tax", "The Single Tax is in force!");
+}
+
+static void cmd_scores(const char *title)
+{
+    const Game *g = &app.game;
+    static char lines[16][120];
+    static const char *ptr[17];
+    int order[MAXPLAYERS], n = g->nplayers, k = 0;
+    for (int i = 0; i < n; i++) order[i] = i;
+    for (int i = 1; i < n; i++)
+        for (int j = i; j > 0 && game_worth(g, order[j]) > game_worth(g, order[j - 1]); j--) {
+            int t = order[j]; order[j] = order[j - 1]; order[j - 1] = t;
+        }
+    snprintf(lines[k++], 120, "%-18s %6s %6s %6s %6s %7s", "Player", "Cash", "Cards", "Houses", "Lux.", "Worth");
+    snprintf(lines[k++], 120, "%-18s %6s %6s %6s %6s %7s", "------", "----", "-----", "------", "----", "-----");
+    for (int i = 0; i < n; i++) {
+        const Player *P = &g->pl[order[i]];
+        int cards = 0;
+        for (int sp = 0; sp < NSPACES; sp++)
+            if (g->owner[sp] == order[i] && !(g->single_tax && board[sp].type == T_LOT)) cards++;
+        snprintf(lines[k++], 120, "%-18.18s %6d %6d %6d %6d %7d", P->name, P->cash, cards,
+                 game_houses_of(g, order[i]), P->luxuries + P->professors, game_worth(g, order[i]));
+    }
+    snprintf(lines[k++], 120, " ");
+    snprintf(lines[k++], 120, "Every card, house and luxury counts 100%s.",
+             g->single_tax ? " (lot title deeds count nothing under the Single Tax)" : "");
+    snprintf(lines[k++], 120, "Turns played: %d.  Public Treasury: $%d.  Wages: $%d.", g->turn_no, g->treasury, g->wage);
+    if (g->over) {
+        snprintf(lines[k++], 120, " ");
+        snprintf(lines[k++], 120, "%s", order[0] == 0 ? "You are the winner - the millionaire!"
+                                                        : "The winner is the player at the top.");
+    }
+    for (int i = 0; i < k; i++) ptr[i] = lines[i];
+    ptr[k] = NULL;
+    ui_info_box(title, ptr);
+}
+
+/* Click on a space: what it is. */
+static void cmd_space_info(int sp)
+{
+    const Game *g = &app.game;
+    const Space *s = &board[sp];
+    char text[800], extra[300] = "";
+    switch (s->type) {
+    case T_LOT:
+        snprintf(extra, sizeof extra, "A lot. Sale price $%d, land rent $%d, $10 more for each house.",
+                 s->price, game_land_rent(g, sp));
+        break;
+    case T_RAILROAD:
+        snprintf(extra, sizeof extra, "A railroad. Charter $%d. Fare now $%d.", s->price, game_rail_fare(g, sp));
+        break;
+    case T_FRANCHISE:
+        snprintf(extra, sizeof extra, "A public utility held by private parties. Charter $%d. $5, or $25 with the "
+                 "Municipal Cinch.", s->price);
+        break;
+    case T_TAX:
+        snprintf(extra, sizeof extra, "An Absolute Necessity of life: $%d tax (indirect taxation).", game_tax(g));
+        break;
+    case T_TRESPASS:
+        snprintf(extra, sizeof extra, g->colleges[sp] ? "A FREE COLLEGE stands here: stop for an Education card."
+                                                      : "Land held out of use. Trespassers go to Jail.");
+        break;
+    case T_CHANCE:      snprintf(extra, sizeof extra, "Draw a card from the red pack."); break;
+    case T_LUXURY:      snprintf(extra, sizeof extra, "Pay $75 for a luxury (counts 100), or move backward."); break;
+    case T_SPECULATION: snprintf(extra, sizeof extra, "The broker's game. Broker's License $%d.", s->price); break;
+    case T_LEGACY:      snprintf(extra, sizeof extra, "A legacy of $100."); break;
+    case T_MOTHER:      snprintf(extra, sizeof extra, "Labor upon Mother Earth produces wages: $%d each time you reach or pass it.", g->wage); break;
+    case T_JAIL:        snprintf(extra, sizeof extra, "Jail. $50 fine, or a double, to come out."); break;
+    case T_PARK:        snprintf(extra, sizeof extra, "Central Park, maintained by public funds: free."); break;
+    case T_POOR:        snprintf(extra, sizeof extra, "The Poor House, for those who cannot pay their way."); break;
+    }
+    int len = snprintf(text, sizeof text, "%s", extra);
+    if (g->public_owned[sp]) len += snprintf(text + len, sizeof text - (size_t)len, "\n\nOwned by the public: free to all.");
+    else if (board_has_card(sp)) {
+        if (g->owner[sp] == NOBODY) len += snprintf(text + len, sizeof text - (size_t)len, "\n\nThe card is in the pack.");
+        else len += snprintf(text + len, sizeof text - (size_t)len, "\n\nHeld by %s.", g->pl[g->owner[sp]].name);
+    }
+    if (g->houses[sp] && len < (int)sizeof text)
+        snprintf(text + len, sizeof text - (size_t)len, " %d house%s, built by %s.", g->houses[sp],
+                 g->houses[sp] == 1 ? "" : "s", g->pl[g->house_owner[sp]].name);
+    int save = app.highlight;
+    app.highlight = sp;
+    ui_message(s->name, text);
+    app.highlight = save;
+}
+
+static void cmd_about(void)
+{
+    ui_message("About Viola the Landlord",
+               "Viola the Landlord " PACKAGE_VERSION_STR "\n\n"
+               "The Landlord's Game, invented by Lizzie J. Magie (US Patent 748,626, 1904), played by the rules "
+               "of 1906 with the Single Tax, against the computer, in the style of the Viola browser.\n\n"
+               "Copyright (C) 2026 Lee Curtis. Free software under the GNU GPL, version 3 or later.");
+}
+
+static void roll(void)
+{
+    if (!app_can_act()) return;
+    app.human_turn = 0;
+    view_set_status("Rolling...");
+    game_turn(&app.game);
+}
+
+static void run_command(Command c)
+{
+    switch (c) {
+    case CMD_NEW_GAME:      cmd_new_game(); break;
+    case CMD_ROLL:          roll(); break;
+    case CMD_BUILD:         if (app_can_act()) cmd_build(); break;
+    case CMD_TRADE_BUY:     if (app_can_act()) cmd_trade_buy(); break;
+    case CMD_TRADE_SELL:    if (app_can_act()) cmd_trade_sell(); break;
+    case CMD_SELL_PACK:     if (app_can_act()) cmd_sell_pack(); break;
+    case CMD_SINGLE_TAX:    if (app_can_propose()) cmd_single_tax(); break;
+    case CMD_SCORES:        if (app.playing) cmd_scores("Standings"); break;
+    case CMD_QUIT:
+        if (!app.playing || app.game.over || ui_yes_no("Quit", "Leave the game in progress?", 0)) quit_requested = 1;
+        break;
+    case CMD_SETTINGS:      cmd_settings(); break;
+    case CMD_SPEED:         cmd_speed(); break;
+    case CMD_TOGGLE_BIDS:   app.prefs.ask_bids = !app.prefs.ask_bids; prefs_save(&app.prefs); break;
+    case CMD_TOGGLE_CONFIRM: app.prefs.confirm_cpu = !app.prefs.confirm_cpu; prefs_save(&app.prefs); break;
+    case CMD_HELP_PLAY:     ui_info_box("How to Play", help_play); break;
+    case CMD_HELP_RULES:    ui_info_box("The Rules of 1906", help_rules); break;
+    case CMD_HELP_HISTORY:  ui_info_box("Lizzie Magie and the Game", help_history); break;
+    case CMD_HELP_KEYS:     ui_info_box("Keyboard", help_keys); break;
+    case CMD_LICENSE:       ui_info_box("License", help_license); break;
+    case CMD_ABOUT:         cmd_about(); break;
+    case CMD_NONE:          break;
+    }
+}
+
+/* The human's status line and focused button. */
+static void update_status(void)
+{
+    const Game *g = &app.game;
+    if (!app.playing) {
+        view_set_status("Welcome. Game > New Game to begin.");
+        view_set_focus(PB_NONE);
+    } else if (g->over) {
+        view_set_status("The game is over: %s wins.", g->pl[game_leader(g)].name);
+        view_set_focus(PB_SCORES);
+    } else if (app.human_turn) {
+        const Player *P = &g->pl[0];
+        if (P->in_jail) view_set_status("Your turn - you are in Jail. Roll the dice.");
+        else view_set_status("Your turn, %s: build, trade, or roll the dice.", P->name);
+        view_set_focus(PB_ROLL);
+    } else {
+        view_set_status("%s is thinking...", g->pl[g->cur].name);
+        view_set_focus(PB_NONE);
+    }
+}
+
+static void handle_key(int k)
+{
+    if (k == K_MOUSE) {
+        if (xw_mouse.button == 4) { view_scroll_log(3); return; }
+        if (xw_mouse.button == 5) { view_scroll_log(-3); return; }
+        if (xw_mouse.button != 1) return;
+        int m = menubar_hit(xw_mouse.x, xw_mouse.y);
+        if (m >= 0) { run_command(menubar_run(m, 1, redraw)); return; }
+        PanelButton b = view_button_at(xw_mouse.x, xw_mouse.y);
+        if (b == PB_ROLL) run_command(CMD_ROLL);
+        else if (b == PB_BUILD) run_command(CMD_BUILD);
+        else if (b == PB_TRADE) {
+            static const char *const items[] = { "&Buy a Card", "&Sell a Card", "Sell to the &Pack", "Cancel" };
+            int i = ui_ask("Trade", "Trade with the other players, or sell back to the pack?", items, 4, 0, 3);
+            if (i == 0) run_command(CMD_TRADE_BUY);
+            else if (i == 1) run_command(CMD_TRADE_SELL);
+            else if (i == 2) run_command(CMD_SELL_PACK);
+        }
+        else if (b == PB_SCORES) run_command(CMD_SCORES);
+        else if (app.playing) {
+            int sp = view_space_at(xw_mouse.x, xw_mouse.y);
+            if (sp >= 0) cmd_space_info(sp);
+        }
+        return;
+    }
+    if (k == 27 || k == K_F(9) || k == K_F(10)) { run_command(menubar_run(MENU_GAME, 0, redraw)); return; }
+    if (IS_ALT(k)) {
+        int m = menubar_for_letter(k - K_ALT0);
+        if (m >= 0) run_command(menubar_run(m, 1, redraw));
+        return;
+    }
+    switch (k) {
+    case K_CLOSE: run_command(CMD_QUIT); break;
+    case 17:      run_command(CMD_QUIT); break;            /* Ctrl+Q */
+    case 14:      run_command(CMD_NEW_GAME); break;        /* Ctrl+N */
+    case ' ': case '\n': case 'r': case 'R':
+        if (app.playing && app.game.over) run_command(CMD_SCORES);
+        else run_command(CMD_ROLL);
+        break;
+    case 'b': case 'B': run_command(CMD_BUILD); break;
+    case 't': case 'T': run_command(CMD_TRADE_BUY); break;
+    case 's': case 'S': run_command(CMD_TRADE_SELL); break;
+    case 'x': case 'X': run_command(CMD_SINGLE_TAX); break;
+    case K_F(1):  run_command(CMD_HELP_PLAY); break;
+    case K_F(2):  run_command(CMD_SCORES); break;
+    case K_PGUP:  view_scroll_log(8); break;
+    case K_PGDN:  view_scroll_log(-8); break;
+    case K_END:   view_scroll_log(0); break;
+    default: break;
+    }
+}
+
+int main(int argc, char **argv)
+{
+    for (int i = 1; i < argc; i++) {
+        if (!strcmp(argv[i], "--version") || !strcmp(argv[i], "-v")) {
+            printf("viola-landlord %s\n", PACKAGE_VERSION_STR);
+            return 0;
+        }
+        if (!strcmp(argv[i], "--help") || !strcmp(argv[i], "-h")) {
+            printf("usage: viola-landlord [--version] [--help]\n"
+                   "The Landlord's Game (Lizzie J. Magie, 1904) against the computer, for X11.\n"
+                   "Settings are kept in ~/.config/viola-landlord/preferences.conf.\n");
+            return 0;
+        }
+        fprintf(stderr, "viola-landlord: unknown option %s (try --help)\n", argv[i]);
+        return 2;
+    }
+    prefs_load(&app.prefs);
+    app.highlight = -1;
+    if (!xw_open()) return 1;
+    xw_show(argc, argv, 1180, 840);
+
+    update_status();
+    view_draw();
+    xw_flush();
+    cmd_new_game();                     /* straight to the New Game form */
+
+    while (!quit_requested) {
+        Game *g = &app.game;
+        if (app.playing && !g->over && g->pl[g->cur].cpu) {
+            app.human_turn = 0;
+            app.cpu_running = 1;
+            update_status();
+            game_turn(g);
+            app.cpu_running = 0;
+            continue;
+        }
+        if (app.playing && !g->over) app.human_turn = 1;
+        if (app.playing && g->over && !final_shown) {
+            final_shown = 1;
+            app.human_turn = 0;
+            update_status();
+            cmd_scores("The Game Is Over");
+            continue;
+        }
+        update_status();
+        view_draw();
+        xw_flush();
+        xw_drain();
+        int k = xw_next_key();
+        if (k == K_RESIZE) continue;
+        handle_key(k);
+    }
+    xw_close();
+    return 0;
+}
