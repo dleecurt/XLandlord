@@ -38,6 +38,7 @@
 #include "keys.h"
 #include "menubar.h"
 #include "net.h"
+#include "netui.h"
 #include "ui.h"
 #include "util.h"
 #include "version.h"
@@ -47,6 +48,7 @@
 App app;
 
 static int humans_in_game(const Game *g);
+static int remote_seat(int p);
 static int quit_requested;
 static int final_shown;
 
@@ -73,6 +75,7 @@ static int cpu_turn(const Game *g) { return app.playing && !g->over && g->pl[g->
 
 static void hook_changed(Game *g)
 {
+    if (net_role() == NET_HOST) net_broadcast(g);
     view_scroll_log(0);
     view_draw();
     xw_flush();
@@ -97,6 +100,7 @@ static void hook_dice(Game *g, int d1, int d2)
 static void hook_chance(Game *g, int p, const char *text)
 {
     if (g->pl[p].cpu) return;
+    if (remote_seat(p)) { net_note(p, "Chance", text); return; }
     char title[64];
     if (humans_in_game(g) > 1) snprintf(title, sizeof title, "%s: Chance", g->pl[p].name);
     else snprintf(title, sizeof title, "Chance");
@@ -129,15 +133,72 @@ static unsigned long time_seed(void)
 
 static const char *const cpu_names[] = { "Lord Blueblood", "Mr. D. F. Hogg", "Mrs. Soakum", "Mr. Slambang" };
 
+/* Humans at this screen: not computer players, not network joiners. */
 static int humans_in_game(const Game *g)
 {
+    if (net_role() == NET_CLIENT) return 1;
     int n = 0;
-    for (int p = 0; p < g->nplayers; p++) n += !g->pl[p].cpu;
+    for (int p = 0; p < g->nplayers; p++) n += !g->pl[p].cpu && !net_seat_remote(p);
     return n;
+}
+
+int app_local_humans(void) { return app.playing ? humans_in_game(&app.game) : 1; }
+
+/* Is player p played at another machine (a joiner still connected)? */
+static int remote_seat(int p) { return net_role() == NET_HOST && net_seat_connected(p); }
+
+/* A message for player p, wherever he sits. */
+static void notify(int p, const char *title, const char *text)
+{
+    if (remote_seat(p)) net_note(p, title, text);
+    else if (!app.game.pl[p].cpu) ui_message(title, text);
+}
+
+/* A joiner's command goes to the host as an ACTION. */
+static int joiner(void) { return net_role() == NET_CLIENT; }
+
+static void send_action(int kind, int a, int b, int c)
+{
+    int n[4] = { kind, a, b, c };
+    if (net_client_send(NM_ACTION, n, 4, NULL) < 0) ui_message("Network Game", "The connection to the host is closed.");
 }
 
 /* The human whose turn was last, for the "Pass to ..." prompt. */
 static int last_human = -1;
+
+static void set_hooks(Game *g)
+{
+    g->hooks.changed = hook_changed;
+    g->hooks.dice = hook_dice;
+    g->hooks.chance = hook_chance;
+    g->hooks.pause = hook_pause;
+}
+
+/* Log who is playing and deal the cards. */
+static void begin(Game *g)
+{
+    app.playing = 1;
+    app.human_turn = 0;
+    app.highlight = -1;
+    final_shown = 0;
+    last_human = -1;
+    char who[240] = "";
+    for (int p = 0; p < g->nplayers; p++) {
+        char one[64];
+        static const char *const dn[] = { "easy", "medium", "hard" };
+        if (g->pl[p].cpu) snprintf(one, sizeof one, "%s (%s)", g->pl[p].name, dn[CLAMP(g->pl[p].difficulty, 0, 2)]);
+        else if (net_seat_remote(p)) snprintf(one, sizeof one, "%s (network)", g->pl[p].name);
+        else snprintf(one, sizeof one, "%s", g->pl[p].name);
+        if (p) strncat(who, p == g->nplayers - 1 ? " and " : ", ", sizeof who - strlen(who) - 1);
+        strncat(who, one, sizeof who - strlen(who) - 1);
+    }
+    game_log(g, "A new game: %s; the game ends at %d wages%s.", who, g->end_wages,
+             g->advanced ? ", advanced rules" : "");
+    view_set_status("The deal.");
+    app.cpu_running = 1;
+    game_deal(g);
+    app.cpu_running = 0;
+}
 
 static void start_game(void)
 {
@@ -163,33 +224,29 @@ static void start_game(void)
     }
     game_new(&app.game, &s);
     Game *g = &app.game;
-    g->hooks.changed = hook_changed;
-    g->hooks.dice = hook_dice;
-    g->hooks.chance = hook_chance;
-    g->hooks.pause = hook_pause;
+    set_hooks(g);
     for (int p = 0; p < g->nplayers; p++)
         game_set_decider(g, p, kinds[p] == SEAT_HUMAN ? &human_decider : &ai_decider);
-    app.playing = 1;
-    app.human_turn = 0;
-    app.highlight = -1;
-    final_shown = 0;
-    last_human = -1;
+    begin(g);
+}
 
-    char who[200] = "";
-    for (int p = 0; p < g->nplayers; p++) {
-        char one[64];
-        static const char *const dn[] = { "easy", "medium", "hard" };
-        if (g->pl[p].cpu) snprintf(one, sizeof one, "%s (%s)", g->pl[p].name, dn[CLAMP(g->pl[p].difficulty, 0, 2)]);
-        else snprintf(one, sizeof one, "%s", g->pl[p].name);
-        if (p) strncat(who, p == g->nplayers - 1 ? " and " : ", ", sizeof who - strlen(who) - 1);
-        strncat(who, one, sizeof who - strlen(who) - 1);
-    }
-    game_log(g, "A new game: %s; the game ends at %d wages%s.", who, g->end_wages,
-             g->advanced ? ", advanced rules" : "");
-    view_set_status("The deal.");
-    app.cpu_running = 1;
-    game_deal(g);
-    app.cpu_running = 0;
+/* Hosting: the setup form and the lobby (netui.c), then the game, with
+ * the joiners' seats played through net_decider. */
+static int host_action(Game *g, int p, const NetMsg *m);
+
+static void start_network_game(void)
+{
+    GameSettings s;
+    if (!netui_host_setup(&s)) return;
+    s.seed = time_seed();
+    game_new(&app.game, &s);
+    Game *g = &app.game;
+    set_hooks(g);
+    for (int p = 0; p < g->nplayers; p++)
+        game_set_decider(g, p, p == 0 ? &human_decider : g->pl[p].cpu ? &ai_decider : &net_decider);
+    net_set_action_handler(host_action);
+    net_start_game(g);
+    begin(g);
 }
 
 /* The settings form: who sits where, the length and the rules. Returns 1 if
@@ -245,6 +302,8 @@ static void cmd_new_game(void)
         !ui_yes_no("New Game", "Abandon the game in progress?", 0))
         return;
     if (!settings_form("New Game", "&Start")) return;
+    if (net_role() != NET_NONE) net_close("The game has been closed.");
+    app.me = 0;
     start_game();
 }
 
@@ -261,10 +320,138 @@ static void cmd_speed(void)
     if (i >= 0) { app.prefs.speed = i; prefs_save(&app.prefs); }
 }
 
-/* ---- the business of the human whose turn it is ---- */
+/* ---- the business of the human whose turn it is ----
+ *
+ * The cmd_* functions ask the player at this screen what he wants; the act_*
+ * functions do it. A network joiner's act_* send an ACTION to the host,
+ * whose host_action() calls the same act_* for the joiner's seat, so a
+ * build, a trade or a proposal works the same wherever it comes from. */
 
-/* The player acting now (the current player, who is human when these run). */
-static int me(void) { return app.game.cur; }
+/* The player acting at this screen: the current player, or a joiner's own seat. */
+static int me(void) { return joiner() ? app.me : app.game.cur; }
+
+/* Would `seller` sell card sp to `buyer` for `price`? Asks him wherever he sits. */
+static int seat_accepts_sale(int seller, int buyer, int sp, int price)
+{
+    Game *g = &app.game;
+    if (g->pl[seller].cpu) return ai_accepts_sale(g, seller, sp, price);
+    if (remote_seat(seller)) {
+        int r = net_ask(seller, NA_ACCEPT_SALE, buyer, sp, price, NULL);
+        return r >= 0 ? r : ai_accepts_sale(g, seller, sp, price);
+    }
+    return human_accepts_sale(g, seller, buyer, sp, price);
+}
+
+/* Would `buyer` pay `price` for `seller`'s card sp? */
+static int seat_accepts_purchase(int buyer, int seller, int sp, int price)
+{
+    Game *g = &app.game;
+    if (g->pl[buyer].cpu) return ai_offer_for(g, buyer, sp) >= price;
+    if (remote_seat(buyer)) {
+        int r = net_ask(buyer, NA_ACCEPT_PURCHASE, seller, sp, price, NULL);
+        return r > 0;
+    }
+    return human_accepts_purchase(g, buyer, seller, sp, price);
+}
+
+static void act_build(int p, int sp)
+{
+    if (joiner()) { send_action(NX_BUILD, sp, 0, 0); return; }
+    const char *err = game_build(&app.game, p, sp);
+    if (err) notify(p, "Build a House", err);
+}
+
+static void act_trade_buy(int buyer, int seller, int sp, int price)
+{
+    if (joiner()) { send_action(NX_TRADE_BUY, seller, sp, price); return; }
+    Game *g = &app.game;
+    if (seller < 0 || seller >= g->nplayers || g->owner[sp] != seller || price <= 0 || price > g->pl[buyer].cash) {
+        notify(buyer, "Buy a Card", "That offer cannot be made.");
+        return;
+    }
+    int yes = seat_accepts_sale(seller, buyer, sp, price);
+    char msg[200];
+    if (yes && !game_trade(g, seller, buyer, sp, price)) {
+        snprintf(msg, sizeof msg, "%s accepts: %s goes to %s for $%d.", g->pl[seller].name, board[sp].name,
+                 g->pl[buyer].name, price);
+        notify(buyer, "Sold", msg);
+    } else {
+        snprintf(msg, sizeof msg, "%s declines the offer of $%d for %s.", g->pl[seller].name, price, board[sp].name);
+        notify(buyer, "Declined", msg);
+    }
+    if (humans_in_game(g) > 1 && !g->pl[seller].cpu && !remote_seat(seller)) last_human = seller;
+}
+
+static void act_trade_sell(int seller, int buyer, int sp, int price)
+{
+    if (joiner()) { send_action(NX_TRADE_SELL, buyer, sp, price); return; }
+    Game *g = &app.game;
+    if (buyer < 0 || buyer >= g->nplayers || buyer == seller || g->owner[sp] != seller || price <= 0) {
+        notify(seller, "Sell a Card", "That sale cannot be made.");
+        return;
+    }
+    if (price > g->pl[buyer].cash) { notify(seller, "Sell a Card", "The buyer has not that much money."); return; }
+    int yes = seat_accepts_purchase(buyer, seller, sp, price);
+    char msg[200];
+    if (yes && !game_trade(g, seller, buyer, sp, price)) {
+        snprintf(msg, sizeof msg, "%s buys %s for $%d.", g->pl[buyer].name, board[sp].name, price);
+        notify(seller, "Sold", msg);
+    } else {
+        snprintf(msg, sizeof msg, "%s will not pay $%d for %s.", g->pl[buyer].name, price, board[sp].name);
+        notify(seller, "Declined", msg);
+    }
+    if (humans_in_game(g) > 1 && !g->pl[buyer].cpu && !remote_seat(buyer)) last_human = buyer;
+}
+
+/* A sale to the pack, of a house, or to a computer player at his offer. */
+static void act_sell(int p, int kind, int sp, int buyer)
+{
+    if (joiner()) { send_action(NX_SELL, net_sale_encode(kind, sp, buyer), 0, 0); return; }
+    Game *g = &app.game;
+    if (sp < 0 || sp >= NSPACES) return;
+    const char *err = "That cannot be sold.";
+    if (kind == 1) err = game_sell_house(g, p, sp);
+    else if (kind == 3) err = game_sell_to_pack(g, p, sp);
+    else if (kind == 2 && buyer >= 0 && buyer < g->nplayers && g->pl[buyer].cpu) {
+        int offer = ai_offer_for(g, buyer, sp);
+        err = offer > 0 ? game_trade(g, p, buyer, sp, offer) : "No offer is made for that card now.";
+    }
+    if (err) notify(p, "Sell", err);
+}
+
+static void act_propose(int p)
+{
+    if (joiner()) { send_action(NX_PROPOSE, 0, 0, 0); return; }
+    if (app.game.single_tax) return;
+    app.cpu_running = 0;
+    int ok = game_propose_single_tax(&app.game, p);
+    notify(p, "The Single Tax", ok ? "The Single Tax is in force!" : "The Single Tax is defeated.");
+    last_human = -2;                            /* other humans voted: say whose turn it is again */
+}
+
+/* A joiner's ACTION, at the host (net.c calls it during the joiner's turn). */
+static int host_action(Game *g, int p, const NetMsg *m)
+{
+    int a = m->num[1], b = m->num[2], c = m->num[3];
+    int sp_ok = b >= 0 && b < NSPACES;
+    switch (m->num[0]) {
+    case NX_BUILD:      if (a >= 0 && a < NSPACES) act_build(p, a); break;
+    case NX_TRADE_BUY:  if (sp_ok) act_trade_buy(p, a, b, c); break;
+    case NX_TRADE_SELL: if (sp_ok) act_trade_sell(p, a, b, c); break;
+    case NX_SELL: {
+        int kind, sp, buyer;
+        net_sale_decode(a, &kind, &sp, &buyer);
+        act_sell(p, kind, sp, buyer);
+        break;
+    }
+    case NX_PROPOSE:    act_propose(p); break;
+    default: break;
+    }
+    view_draw();
+    xw_flush();
+    (void)g;
+    return 0;
+}
 
 static void cmd_build(void)
 {
@@ -291,8 +478,9 @@ static void cmd_build(void)
                  "%s has $%d.", g->pl[p].name, g->pl[p].cash);
         int i = ui_choose("Build a House (Rule 14)", note, ptr, n, 0);
         if (i < 0) return;
-        const char *err = game_build(g, p, sps[i]);
-        if (err) { ui_message("Build a House", err); return; }
+        if (g->pl[p].cash < HOUSE_PRICE) { ui_message("Build a House", "A house costs $100."); return; }
+        act_build(p, sps[i]);
+        if (joiner()) { netui_client_pump(500); }   /* see the house before choosing again */
     }
 }
 
@@ -300,26 +488,6 @@ static void cmd_build(void)
 static int tradable(const Game *g, int sp)
 {
     return !(g->single_tax && board[sp].type == T_LOT) && !(g->houses[sp] && !g->single_tax);
-}
-
-/* Offer `price` to `seller` for card sp on behalf of `buyer`: a computer
- * seller decides at once, a human seller is asked at this screen. */
-static void offer_to_buy(int buyer, int seller, int sp, int price)
-{
-    Game *g = &app.game;
-    int yes = g->pl[seller].cpu ? ai_accepts_sale(g, seller, sp, price)
-                                : human_accepts_sale(g, seller, buyer, sp, price);
-    char msg[200];
-    if (yes) {
-        game_trade(g, seller, buyer, sp, price);
-        snprintf(msg, sizeof msg, "%s accepts: %s goes to %s for $%d.", g->pl[seller].name, board[sp].name,
-                 g->pl[buyer].name, price);
-        ui_message("Sold", msg);
-    } else {
-        snprintf(msg, sizeof msg, "%s declines the offer of $%d for %s.", g->pl[seller].name, price, board[sp].name);
-        ui_message("Declined", msg);
-    }
-    if (humans_in_game(g) > 1 && !g->pl[seller].cpu) last_human = seller;    /* hand back to the buyer */
 }
 
 static void cmd_trade_buy(void)
@@ -346,7 +514,7 @@ static void cmd_trade_buy(void)
              g->pl[o].name, board[sp].name, board[sp].price, g->pl[p].cash);
     if (!ui_number("Your Offer", note, &offer) || offer <= 0) return;
     if (offer > g->pl[p].cash) { ui_message("Your Offer", "You have not that much money."); return; }
-    offer_to_buy(p, o, sp, offer);
+    act_trade_buy(p, o, sp, offer);
 }
 
 static void cmd_trade_sell(void)
@@ -367,8 +535,8 @@ static void cmd_trade_sell(void)
     if (i < 0) return;
     int sp = sps[i];
 
-    /* The buyers: each computer player's own offer, or a human named with
-     * an asking price. */
+    /* The buyers: each computer player's own offer, or a human (here or
+     * over the network) named with an asking price. */
     char bitems[MAXPLAYERS][120];
     const char *bptr[MAXPLAYERS];
     int who[MAXPLAYERS], price[MAXPLAYERS], nb = 0;
@@ -392,22 +560,15 @@ static void cmd_trade_sell(void)
     int k = ui_choose("Sell a Card to a Player", note, bptr, nb, 0);
     if (k < 0) return;
     int q = who[k];
-    if (price[k] >= 0) {                        /* a computer player's offer: take it */
-        game_trade(g, p, q, sp, price[k]);
-        return;
+    int ask = price[k];
+    if (ask < 0) {
+        ask = board[sp].price;
+        snprintf(note, sizeof note, "Your price to %s for %s? (Sale price $%d; %s has $%d.)", g->pl[q].name,
+                 board[sp].name, board[sp].price, g->pl[q].name, g->pl[q].cash);
+        if (!ui_number("Your Price", note, &ask) || ask <= 0) return;
+        if (ask > g->pl[q].cash) { ui_message("Your Price", "The buyer has not that much money."); return; }
     }
-    int ask = board[sp].price;
-    snprintf(note, sizeof note, "Your price to %s for %s? (Sale price $%d; %s has $%d.)", g->pl[q].name,
-             board[sp].name, board[sp].price, g->pl[q].name, g->pl[q].cash);
-    if (!ui_number("Your Price", note, &ask) || ask <= 0) return;
-    if (ask > g->pl[q].cash) { ui_message("Your Price", "The buyer has not that much money."); return; }
-    if (human_accepts_purchase(g, q, p, sp, ask)) {
-        game_trade(g, p, q, sp, ask);
-        ui_message("Sold", "The sale is made.");
-    } else {
-        ui_message("Declined", "The offer is declined.");
-    }
-    last_human = q;
+    act_trade_sell(p, q, sp, ask);
 }
 
 static void cmd_sell_pack(void)
@@ -417,7 +578,10 @@ static void cmd_sell_pack(void)
     char note[200];
     snprintf(note, sizeof note, "Cards go back to the pack for half their sale price, houses to the bank for "
              "$50, or to a computer player at his offer. You have $%d.", g->pl[p].cash);
-    while (human_sell_menu(g, p, "Sell", note, 0)) {
+    int kind, sp, buyer, price;
+    while (human_choose_sale(g, p, "Sell", note, 0, &kind, &sp, &buyer, &price)) {
+        act_sell(p, kind, sp, buyer);
+        if (joiner()) netui_client_pump(500);
         snprintf(note, sizeof note, "Sell anything else? You have $%d.", g->pl[p].cash);
     }
 }
@@ -429,10 +593,7 @@ static void cmd_single_tax(void)
                    "Public Treasury and title deeds to lots are worth nothing; the treasury frees the utilities, "
                    "builds colleges and raises wages.", 0))
         return;
-    app.cpu_running = 0;
-    int ok = game_propose_single_tax(&app.game, me());
-    ui_message("The Single Tax", ok ? "The Single Tax is in force!" : "The Single Tax is defeated.");
-    last_human = -2;                            /* other humans voted: say whose turn it is again */
+    act_propose(me());
 }
 
 static void cmd_scores(const char *title)
@@ -527,25 +688,29 @@ static void cmd_about(void)
                "Copyright (C) 2026 Lee Curtis. Free software under the GNU GPL, version 3 or later.");
 }
 
-/* Network play: the menus are in place; net.c says it is not ready yet. */
+/* ---- network play ---- */
+
+static void leave_network(const char *why)
+{
+    if (net_role() != NET_NONE) net_close(why);
+}
+
 static void cmd_net_host(void)
 {
-    char err[400];
-    int port = NET_PORT;
-    if (!ui_number("Host a Network Game", "The TCP port to listen on (players join with your address and this port):", &port))
+    if (joiner()) { ui_message("Host a Network Game", "Leave the game you have joined first."); return; }
+    if (app.playing && !app.game.over && !ui_yes_no("Host a Network Game", "Abandon the game in progress?", 0))
         return;
-    if (net_host(port, err, sizeof err) < 0) ui_message("Host a Network Game", err);
+    leave_network("The host has started a new game.");
+    start_network_game();
 }
 
 static void cmd_net_join(void)
 {
-    char host[128] = "", err[400];
-    if (!ui_prompt("Join a Network Game", "The host's address, as host or host:port:", host, sizeof host) || !host[0])
+    if (app.playing && !app.game.over && !ui_yes_no("Join a Network Game", "Abandon the game in progress?", 0))
         return;
-    int port = NET_PORT;
-    char *colon = strrchr(host, ':');
-    if (colon && !strchr(colon + 1, ']')) { *colon = '\0'; port = atoi(colon + 1); }
-    if (net_join(host, port, app.prefs.names[0], err, sizeof err) < 0) ui_message("Join a Network Game", err);
+    leave_network("The host has left the game.");
+    app.playing = 0;
+    netui_join();
 }
 
 static void roll(void)
@@ -553,6 +718,7 @@ static void roll(void)
     if (!app_can_act()) return;
     app.human_turn = 0;
     view_set_status("Rolling...");
+    if (joiner()) { send_action(NX_ROLL, 0, 0, 0); return; }
     game_turn(&app.game);
 }
 
@@ -579,6 +745,7 @@ static void run_command(Command c)
     case CMD_HELP_PLAY:     ui_info_box("How to Play", help_play); break;
     case CMD_HELP_RULES:    ui_info_box("The Rules of 1906", help_rules); break;
     case CMD_HELP_HISTORY:  ui_info_box("Lizzie Magie and the Game", help_history); break;
+    case CMD_HELP_NETWORK:  ui_info_box("Network Play", help_network); break;
     case CMD_HELP_KEYS:     ui_info_box("Keyboard", help_keys); break;
     case CMD_LICENSE:       ui_info_box("License", help_license); break;
     case CMD_ABOUT:         cmd_about(); break;
@@ -601,6 +768,12 @@ static void update_status(void)
         if (P->in_jail) view_set_status("%s's turn - in Jail. Roll the dice.", P->name);
         else view_set_status("%s's turn: build, trade, or roll the dice.", P->name);
         view_set_focus(PB_ROLL);
+    } else if (joiner()) {
+        view_set_status(g->cur == app.me ? "Waiting for the host..." : "%s is playing...", g->pl[g->cur].name);
+        view_set_focus(PB_NONE);
+    } else if (remote_seat(g->cur)) {
+        view_set_status("%s is playing on his own machine...", g->pl[g->cur].name);
+        view_set_focus(PB_NONE);
     } else {
         view_set_status("%s is thinking...", g->pl[g->cur].name);
         view_set_focus(PB_NONE);
@@ -661,6 +834,8 @@ static void handle_key(int k)
 
 int main(int argc, char **argv)
 {
+    /* Started by a joiner's ssh on the host's machine: be the relay. */
+    if (argc == 3 && !strcmp(argv[1], "--relay")) return net_relay(atoi(argv[2]));
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--version") || !strcmp(argv[i], "-v")) {
             printf("viola-landlord %s\n", PACKAGE_VERSION_STR);
@@ -668,6 +843,7 @@ int main(int argc, char **argv)
         }
         if (!strcmp(argv[i], "--help") || !strcmp(argv[i], "-h")) {
             printf("usage: viola-landlord [--version] [--help]\n"
+                   "       viola-landlord --relay PORT   (run by ssh for network play; not by hand)\n"
                    "The Landlord's Game (Lizzie J. Magie, 1904) against the computer, for X11.\n"
                    "Settings are kept in ~/.config/viola-landlord/preferences.conf.\n");
             return 0;
@@ -685,8 +861,43 @@ int main(int argc, char **argv)
     xw_flush();
     cmd_new_game();                     /* straight to the New Game form */
 
+    net_set_idle(netui_idle);
     while (!quit_requested) {
         Game *g = &app.game;
+        /* A network joiner: the host plays the game; draw what it sends,
+         * answer its questions, act on my turn. */
+        if (joiner()) {
+            if (app.playing && g->over && !final_shown) {
+                final_shown = 1;
+                update_status();
+                cmd_scores("The Game Is Over");
+                continue;
+            }
+            update_status();
+            view_draw();
+            xw_flush();
+            int k = xw_wait_key(100);
+            if (k != K_TIMEOUT && k != K_RESIZE) {
+                if (k == K_CLOSE) {
+                    if (ui_yes_no("Quit", "Leave the network game?", 0)) { net_close("A player has left."); quit_requested = 1; }
+                } else {
+                    handle_key(k);
+                }
+            }
+            netui_client_pump(0);
+            continue;
+        }
+        /* The host: keep the joiners' boards up to date (only changes are sent). */
+        if (net_role() == NET_HOST && app.playing) net_broadcast(g);
+        /* The host: a joiner's turn is played through net_decider. */
+        if (app.playing && !g->over && remote_seat(g->cur)) {
+            app.human_turn = 0;
+            update_status();
+            view_draw();
+            xw_flush();
+            game_turn(g);
+            continue;
+        }
         if (app.playing && !g->over && g->pl[g->cur].cpu) {
             app.human_turn = 0;
             app.cpu_running = 1;
@@ -719,10 +930,19 @@ int main(int argc, char **argv)
         view_draw();
         xw_flush();
         xw_drain();
-        int k = xw_next_key();
+        int k;
+        if (net_role() == NET_HOST) {
+            /* Keep answering the network: turn latecomers away, notice who leaves. */
+            k = xw_wait_key(200);
+            net_host_poll(0);
+            if (k == K_TIMEOUT) continue;
+        } else {
+            k = xw_next_key();
+        }
         if (k == K_RESIZE) continue;
         handle_key(k);
     }
+    if (net_role() != NET_NONE) net_close(joiner() ? "A player has left." : "The host has quit.");
     xw_close();
     return 0;
 }

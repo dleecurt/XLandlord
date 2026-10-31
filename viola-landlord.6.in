@@ -8,6 +8,9 @@ viola-landlord \- The Landlord's Game (Lizzie J. Magie, 1904) against the comput
 .B viola-landlord
 .RB [ \-\-version ]
 .RB [ \-\-help ]
+.br
+.B viola\-landlord \-\-relay
+.I port
 .SH DESCRIPTION
 .B Viola the Landlord
 plays
@@ -22,7 +25,9 @@ screen (players take turns at the keyboard) or a computer player at an
 .B Medium
 or
 .B Hard
-level. Network play is planned but not yet available. The window is drawn in the style of the Viola web browser: flat
+level. Players on other machines can join over
+.BR ssh (1);
+see NETWORK PLAY. The window is drawn in the style of the Viola web browser: flat
 gray94 panels, raised bevels, black focus boxes, Helvetica menus.
 .PP
 The game ends when a player has drawn his wages five times (three, seven or
@@ -38,6 +43,40 @@ Before rolling you may build houses, buy or sell cards, or propose the
 Single Tax from the
 .B Game
 menu. Click a space on the board to read about it.
+.SH NETWORK PLAY
+One player chooses
+.BR "Game > Host a Network Game" ;
+up to three others choose
+.B "Game > Join a Network Game"
+and give the host's machine as
+.B ssh
+would,
+.RI [ user\fB@\fP] host [\fB:\fP port ].
+The joiner's game runs
+.PP
+.RS
+.B ssh \-T \-o BatchMode=yes
+.I user\fB@\fPhost
+.B viola\-landlord \-\-relay
+.I port
+.RE
+.PP
+and the relay connects to the hosting game, which listens on 127.0.0.1 only
+(port 1904 unless the host chose another). Four players at most: a fifth is
+turned away with a warning. When fewer than four humans play, one computer
+player takes a free seat; with four humans there is none. A joiner whose
+connection drops is replaced by a computer player.
+.PP
+Password-less ssh (a key, e.g.
+.B ssh\-keygen
+then
+.BR ssh\-copy\-id )
+is required; check it with
+.BR "ssh \-o BatchMode=yes user@host viola\-landlord \-\-version" .
+.TP
+.BI \-\-relay " port"
+(run by ssh on the host, not by hand) connect standard input and output to
+the game hosted on this machine.
 .SH KEYS
 .TP
 .BR Space ", " Enter ", " R
@@ -75,7 +114,14 @@ the seats
 .RI ( seat1 " .. " seat4 :
 empty, human, easy, medium, hard), the human players' names
 .RI ( name1 " .. " name4 ),
-the length of the game, the rules, and the options, as
+the length of the game, the rules, the options, and for network play
+.IR net_host ,
+.IR net_port ,
+.I net_command
+(the program ssh runs on the host; give a full path if it is not on the
+host's PATH for non-interactive ssh) and
+.IR net_cpu ,
+as
 .I key = value
 lines.
 .SH ENVIRONMENT

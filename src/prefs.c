@@ -69,6 +69,10 @@ void prefs_defaults(Prefs *p)
     p->ask_bids = 1;
     p->confirm_cpu = 0;
     p->speed = 1;
+    p->net_host[0] = '\0';
+    p->net_port = 1904;
+    copy_str(p->net_command, sizeof p->net_command, "viola-landlord");
+    p->net_cpu = SEAT_MEDIUM;
 }
 
 static const char *const seat_word[SEAT_KINDS] = { "empty", "human", "easy", "medium", "hard", "network" };
@@ -136,6 +140,10 @@ void prefs_load(Prefs *p)
         else if (!strcmp(key, "ask_bids")) p->ask_bids = n != 0;
         else if (!strcmp(key, "confirm_cpu")) p->confirm_cpu = n != 0;
         else if (!strcmp(key, "speed")) p->speed = CLAMP(n, 0, 2);
+        else if (!strcmp(key, "net_host")) copy_str(p->net_host, sizeof p->net_host, val);
+        else if (!strcmp(key, "net_port") && n > 0 && n < 65536) p->net_port = n;
+        else if (!strcmp(key, "net_command") && *val) copy_str(p->net_command, sizeof p->net_command, val);
+        else if (!strcmp(key, "net_cpu")) { int k = seat_from_word(val); if (k >= SEAT_EASY && k <= SEAT_HARD) p->net_cpu = k; }
     }
     fclose(f);
     /* A table needs two players and someone at the screen. */
@@ -164,6 +172,12 @@ int prefs_save(const Prefs *p)
     fprintf(f, "ask_bids = %d\n", p->ask_bids);
     fprintf(f, "confirm_cpu = %d\n", p->confirm_cpu);
     fprintf(f, "speed = %d\n", p->speed);
+    fprintf(f, "# network play: the last host joined, the port to host on, the program ssh runs on\n"
+               "# the host (give a full path if it is not on the host's PATH), the computer player\n");
+    fprintf(f, "net_host = %s\n", p->net_host);
+    fprintf(f, "net_port = %d\n", p->net_port);
+    fprintf(f, "net_command = %s\n", p->net_command);
+    fprintf(f, "net_cpu = %s\n", seat_word[CLAMP(p->net_cpu, SEAT_EASY, SEAT_HARD)]);
     return fclose(f) == 0;
 }
 

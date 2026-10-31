@@ -18,65 +18,53 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* net.h - network play: THE PLAN, and the parts already in place.
+/* net.h - network play over ssh: the transport, the protocol and the network
+ * seat. No X here (netui.c holds the dialogs), so the tests link it alone.
  *
- * STATUS: a skeleton. The protocol's message format (net_format /
- * net_parse) and the network seat's Decider are written and tested; the
- * sockets, the lobby and the client's drawing are stubs that say so.
- * Everything marked TODO below is the work left.
+ * THE MODEL: ONE HOST, UP TO THREE JOINERS
+ *   One player hosts: his program runs the only real Game (game.c) and
+ *   listens for players on 127.0.0.1 only - never on the network. The others
+ *   join over ssh: the joiner's program runs
  *
- * THE DESIGN: ONE GAME, ON THE HOST
- *   The host runs the only real Game (game.c), exactly as for hot-seat play.
- *   A seat taken by a player on another machine gets net_decider: each of
- *   its questions (buy? bid? pay the fine?...) is sent to that player's
- *   machine as an ASK message, and the engine waits for the ANSWER - the
- *   engine already waits for answers from dialogs, so game.c does not
- *   change at all. Clients hold no rules: after every change the host sends
- *   them the STATE and the new LOG lines, which they draw with view.c, and
- *   they answer ASKs with the same dialogs human.c shows at the host.
+ *       ssh -T -o BatchMode=yes [user@]host viola-landlord --relay PORT
  *
- *     host                                   client (one per remote seat)
- *     ----                                   ------
- *     game.c --question--> net_decider --ASK--> dialog (human.c)
- *            <--answer---              <-ANSWER-
- *     hooks.changed ------------------STATE/LOG--> view_draw
- *     main loop <---------------------ACTION----- Roll / Build / Trade menus
+ *   and the relay, a copy of viola-landlord started by ssh on the host,
+ *   connects to the hosting game on localhost and copies bytes both ways.
+ *   ssh does the authentication and the encryption; the game never opens a
+ *   port to the outside. (Password-less ssh keys are assumed: see README.)
  *
- * THE PROTOCOL
- *   TCP, default port NET_PORT. One message per line of plain ASCII,
- *   fields separated by single spaces, the last field may contain spaces
- *   (text). Lines are at most NET_LINE_MAX bytes.
+ *     joiner's game <--pipe--> ssh ====network==== sshd --> relay <--TCP 127.0.0.1--> host game
  *
- *     client -> host   HELLO <protocol> <name>      ask for a seat
- *     host -> client   WELCOME <seat> <nplayers>    you are player <seat>
- *     host -> client   REFUSE <text>                no seat (full, wrong version)
- *     host -> client   STATE <fields...>            the whole Game (net_encode_state)
- *     host -> client   LOG <text>                   one line for the record of events
- *     host -> client   ASK <id> <kind> <a> <b> <c> <text>
- *                                                   a Decider question (NetAsk)
- *     client -> host   ANSWER <id> <value>          the reply to ASK <id>
- *     client -> host   ACTION <kind> <a> <b> <c>    on its turn: roll, build, trade...
- *     host -> client   TURN <player>                whose turn it is now
- *     either           CHAT <text>                  a line typed to the table
- *     either           BYE <text>                   leaving (or the host ending the game)
+ *   The table holds four players at most: the host and up to three joiners.
+ *   A fifth human is turned away with a warning (REFUSE). When fewer than four
+ *   humans sit down, ONE computer player takes a free seat; with four humans
+ *   there is no computer player.
  *
- * WHEN A PLAYER DROPS (TODO): the host gives the seat to a computer player
- *   of medium strength and logs it; net_decider already falls back to
- *   ai_decider for any seat that is not connected, so the game never stalls.
+ *   The host's engine asks each remote seat its questions through
+ *   net_decider: the question goes out as ASK and the engine waits for the
+ *   ANSWER, exactly as it waits for a dialog. Joiners hold no rules: they draw
+ *   the STATE the host sends after every change and answer ASKs with the same
+ *   dialogs a local player sees. On his turn a joiner's builds, trades, sales,
+ *   proposals and his throw come to the host as ACTIONs. If a joiner's
+ *   connection drops, a computer player (medium) takes his seat.
  *
- * TODO, in order:
- *   1. net_host / net_join / net_close: sockets (socket, bind, listen,
- *      accept; connect), non-blocking, with line buffering.
- *   2. net_poll(ms): one select() over the X connection and the sockets, so
- *      the window stays alive while the engine waits for an ANSWER. xwin.c
- *      will need to expose its file descriptor (ConnectionNumber).
- *   3. net_encode_state / net_decode_state: every field of Game a client
- *      draws (players, owners, houses, treasury, wage, dice, flags).
- *   4. The lobby: Host a Network Game (port, seats left open for
- *      SEAT_NETWORK in the New Game form) and Join (host:port, name).
- *   5. Client mode in main.c: no engine; draw STATE, answer ASK, send
- *      ACTION from the Roll / Build / Trade commands.
- *   6. A make-check test running a host and clients over the loopback. */
+ * THE PROTOCOL: one message per line, plain ASCII, fields separated by single
+ * spaces; numbers first, then (for some kinds) a free text to the end.
+ *
+ *   joiner -> host  HELLO <protocol> <name>         ask for a seat
+ *   host -> joiner  WELCOME <joined> <name of host>  you are in the lobby
+ *   host -> joiner  REFUSE <text>                    turned away (table full...)
+ *   host -> all     LOBBY <text>                     who is waiting, for display
+ *   host -> all     START <you> <nplayers>           the game begins; you are player <you>
+ *   host -> all     PLAYER <p> <cpu> <diff> <name>   a player's name and kind
+ *   host -> all     STATE <numbers...>               the whole Game (net_encode_state)
+ *   host -> all     LOG <text>                       a line of the record of events
+ *   host -> all     TURN <p>                         it is player p's turn to act
+ *   host -> one     ASK <id> <kind> <a> <b> <c> <text>   a question (NetAsk)
+ *   joiner -> host  ANSWER <id> <value>              the reply
+ *   joiner -> host  ACTION <kind> <a> <b> <c>        on his turn (NetAction)
+ *   host -> one     NOTE <title>|<text>              a message to show in a dialog
+ *   either          BYE <text>                       leaving / the game is over */
 #ifndef NET_H
 #define NET_H
 
@@ -85,32 +73,49 @@
 #include "game.h"
 
 #define NET_PORT        1904    /* the year of the patent */
-#define NET_PROTOCOL    1
-#define NET_LINE_MAX    1024
-#define NET_MAX_FIELDS  64
+#define NET_PROTOCOL    3
+#define NET_LINE_MAX    4096
+#define NET_MAX_FIELDS  320
+#define NET_MAX_REMOTE  (MAXPLAYERS - 1)    /* the host plus three joiners */
 
 typedef enum { NET_NONE, NET_HOST, NET_CLIENT } NetRole;
 
-/* The kinds of message (the first word of a line). */
 typedef enum {
-    NM_HELLO, NM_WELCOME, NM_REFUSE, NM_STATE, NM_LOG, NM_ASK, NM_ANSWER,
-    NM_ACTION, NM_TURN, NM_CHAT, NM_BYE, NM_COUNT, NM_BAD = -1
+    NM_HELLO, NM_WELCOME, NM_REFUSE, NM_LOBBY, NM_START, NM_PLAYER, NM_STATE,
+    NM_LOG, NM_TURN, NM_ASK, NM_ANSWER, NM_ACTION, NM_NOTE, NM_BYE,
+    NM_COUNT, NM_BAD = -1
 } NetMsgKind;
 
-/* The Decider questions, as sent in ASK. */
+/* The questions sent in ASK (a, b, c as noted). */
 typedef enum {
-    NA_DEAL_BUY, NA_BUY, NA_MAX_BID, NA_JAIL_PAY, NA_USE_PASS, NA_DIRECTION,
-    NA_SPECULATE, NA_LUXURY, NA_ST_BUILD, NA_RAISE, NA_VOTE, NA_TRUST, NA_COUNT
+    NA_DEAL_BUY,        /* text: the cards dealt (space numbers); answer: bit i = buy card i */
+    NA_BUY,             /* a = space, b = price, c = high bidder (-1) */
+    NA_MAX_BID,         /* a = space, b = least bid */
+    NA_JAIL_PAY,
+    NA_USE_PASS,        /* a = with the pass, b = without */
+    NA_DIRECTION,       /* a = forward, b = backward */
+    NA_SPECULATE,
+    NA_LUXURY,
+    NA_ST_BUILD,        /* a = space */
+    NA_RAISE,           /* a = amount needed; answer: net_sale_encode, 0 = give up */
+    NA_VOTE,            /* a = proposer */
+    NA_TRUST,           /* a = the other partner */
+    NA_ACCEPT_SALE,     /* you are the seller: a = buyer, b = space, c = price */
+    NA_ACCEPT_PURCHASE, /* you are the buyer: a = seller, b = space, c = price */
+    NA_COUNT
 } NetAsk;
 
-/* The things a client does on its turn, as sent in ACTION. */
+/* The things a joiner does on his turn (a, b, c as noted). */
 typedef enum {
-    NX_ROLL, NX_BUILD, NX_TRADE_BUY, NX_TRADE_SELL, NX_SELL_PACK, NX_SELL_HOUSE,
-    NX_PROPOSE_SINGLE_TAX, NX_COUNT
+    NX_ROLL,            /* throw the dice: ends his business */
+    NX_BUILD,           /* a = space */
+    NX_TRADE_BUY,       /* a = seller, b = space, c = price offered */
+    NX_TRADE_SELL,      /* a = buyer, b = space, c = price asked */
+    NX_SELL,            /* a = net_sale_encode (to the pack, a house, to a computer player) */
+    NX_PROPOSE,         /* propose the Single Tax */
+    NX_COUNT
 } NetAction;
 
-/* A parsed message: its kind, its numeric fields and its text (the rest of
- * the line after the fixed fields). */
 typedef struct {
     NetMsgKind kind;
     int nnum;
@@ -118,46 +123,102 @@ typedef struct {
     char text[NET_LINE_MAX];
 } NetMsg;
 
-/* ---- the message format (written and tested) ---- */
+/* ---- the message format ---- */
 
 const char *net_kind_name(NetMsgKind k);
-
-/* Write one line, without the newline: the kind, `nnum` numbers, then the
- * text if not NULL (newlines in it become spaces). Returns its length, or
- * -1 if it does not fit in `size`. */
+int net_fields_of(NetMsgKind k);        /* numbers before the text (STATE: see below) */
 int net_format(char *out, size_t size, NetMsgKind kind, const int *num, int nnum, const char *text);
+int net_parse(const char *line, NetMsg *m);    /* 0, or -1 if malformed */
 
-/* Parse a line (with or without its newline) that should carry `nnum`
- * numbers before its text. Returns 0, or -1 for a malformed line. */
-int net_parse(const char *line, int nnum, NetMsg *m);
+/* The whole Game as STATE numbers (names travel in PLAYER). Returns the
+ * count written to num[] (at most max). Decoding fills a Game the joiner
+ * draws; it returns 0, or -1 if the numbers do not fit. */
+int net_encode_state(const Game *g, int *num, int max);
+int net_decode_state(Game *g, const int *num, int n);
 
-/* How many numbers each kind of message carries before its text. */
-int net_fields_of(NetMsgKind k);
+/* A sale chosen to raise money: kind 1 a house, 2 to player `buyer`, 3 to
+ * the pack. Encoded in one number (never 0). */
+int  net_sale_encode(int kind, int sp, int buyer);
+void net_sale_decode(int v, int *kind, int *sp, int *buyer);
 
-/* ---- the connection (stubs) ---- */
+/* ---- common ---- */
 
-/* Start hosting on `port` / connect to host:port as `name`. Return 0 on
- * success, or -1 with a message for the player in `err`. Not implemented
- * yet: they always fail with an explanation. */
-int  net_host(int port, char *err, size_t errsize);
-int  net_join(const char *host, int port, const char *name, char *err, size_t errsize);
-void net_close(void);
 NetRole net_role(void);
+/* Close everything (BYE to the other side(s) first). */
+void net_close(const char *why);
+/* In a child process made by fork(): forget the parent's connections
+ * without closing them for the parent (no BYE is sent). */
+void net_after_fork(void);
+/* Called while the program waits on the network, so the window stays alive
+ * (netui.c sets it). It returns 1 if the player asked to stop waiting. */
+void net_set_idle(int (*idle)(void));
 
-/* Is seat p of the hosted game connected to a remote player? */
+/* ---- hosting ---- */
+
+/* Listen on 127.0.0.1:port. 0, or -1 with a message in err. */
+int  net_host(int port, char *err, size_t errsize);
+/* The host's own name, shown to joiners in the lobby. */
+void net_set_host_name(const char *name);
+/* Accept and greet joiners, notice the ones who left; wait at most ms.
+ * Before the game starts joiners wait in the lobby (four humans at most,
+ * counting the host); afterwards newcomers are turned away. Returns 1 if the
+ * lobby changed. */
+int  net_host_poll(int ms);
+int  net_lobby_count(void);             /* joiners waiting */
+const char *net_lobby_name(int i);
+/* Which messages the lobby sent recently ("Lee was turned away: ..."), for
+ * the host's screen; NULL when none is new. */
+const char *net_host_event(void);
+
+/* Seat the table: the host first (name), the joiners in the order they came,
+ * then ONE computer player of `cpu_difficulty` if fewer than four humans.
+ * Fills s->nplayers, names, cpu flags and difficulties. */
+void net_build_table(GameSettings *s, const char *host_name, int cpu_difficulty);
+/* The game has been created from those settings: tell everyone (START,
+ * PLAYER, STATE). From now on the remote seats use net_decider. */
+void net_start_game(Game *g);
+/* Is player p a joiner's seat (still connected or not)? Connected? */
+int  net_seat_remote(int p);
 int  net_seat_connected(int p);
 
-/* Send a Decider question to seat p and wait for the answer. Returns the
- * answer, or -1 if the seat is not connected (the caller then decides for
- * it). The stub returns -1. */
+/* Send STATE and the new LOG lines to every joiner (the host's hooks call
+ * this after every change). */
+void net_broadcast(Game *g);
+/* Show a message on player p's screen. */
+void net_note(int p, const char *title, const char *text);
+/* Tell everyone whose turn it is. */
+void net_turn(int p);
+
+/* Ask remote seat p a question; returns the answer, or -1 if p is not
+ * connected (or drops while thinking). */
 int  net_ask(int p, NetAsk kind, int a, int b, int c, const char *text);
 
-/* Tell every client the game has changed (STATE and the new LOG lines). */
-void net_broadcast(const Game *g);
+/* What the host does with a joiner's ACTION (main.c sets it). Return 1 when
+ * the action ends his business (NX_ROLL). If not set, only NX_ROLL works. */
+void net_set_action_handler(int (*fn)(Game *g, int p, const NetMsg *m));
 
-/* The Decider for a seat played over the network. Until the seat's player
- * is connected, each question is answered by ai_decider, so a network seat
- * plays like a computer player of its difficulty. */
+/* The Decider for joiners' seats: questions go to their machines; a seat
+ * whose player is not connected is played by the computer (medium). */
 extern const Decider net_decider;
+
+/* ---- joining ---- */
+
+/* Connect through ssh to `host` ([user@]host, ssh's own syntax) and ask for a
+ * seat as `name`. `remote_cmd` is the program to run there (normally
+ * "viola-landlord"). The environment variable VIOLA_LANDLORD_SSH replaces
+ * "ssh" (the tests use it). Returns 0 once WELCOMEd, or -1 with the reason
+ * (ssh's own error, or the host's REFUSE) in err. */
+int  net_join(const char *host, int port, const char *remote_cmd, const char *name,
+              char *err, size_t errsize);
+/* The next message from the host, waiting at most ms. 1 = got one, 0 = none
+ * yet, -1 = the connection is closed. */
+int  net_client_recv(NetMsg *m, int ms);
+int  net_client_send(NetMsgKind kind, const int *num, int nnum, const char *text);
+
+/* ---- the relay (viola-landlord --relay PORT, started by ssh) ---- */
+
+/* Connect to the game hosted on this machine and copy stdin to it and its
+ * output to stdout until either side closes. Returns the exit status. */
+int  net_relay(int port);
 
 #endif

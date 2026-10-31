@@ -26,6 +26,7 @@ extern const char *const help_play[];
 extern const char *const help_rules[];
 extern const char *const help_history[];
 extern const char *const help_keys[];
+extern const char *const help_network[];
 extern const char *const help_license[];
 
 #endif

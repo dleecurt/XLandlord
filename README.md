@@ -44,7 +44,7 @@ needs GNU autoconf, automake and pkg-config.
 
 Without the 75dpi fonts the game still runs; X picks the nearest fonts it has.
 
-Current version: **0.0.2** (see `CHANGELOG.md`).
+Current version: **0.0.3** (see `CHANGELOG.md`).
 
 ## Playing
 
@@ -68,16 +68,93 @@ Make two or more seats Human. They take turns at the keyboard and mouse:
   owner, who accepts or declines; **Sell a Card** lists the computer players'
   offers and lets you name a price to any human.
 
-### Network play (not finished)
+### Network play (over ssh)
 
-Game > Host a Network Game and Join a Network Game are in place, but this
-version only explains that network play is not ready. The design and the
-protocol are written up in `src/net.h`: the host runs the only game and sends
-each remote player's questions to his machine; clients just draw the board and
-answer with the same dialogs. The message format and a network seat that the
-computer plays until its player connects are written and tested
-(`tests/net.c`); the sockets, the lobby and the client mode are the work left,
-listed there as TODO in order. The default port will be 1904.
+One player **hosts** and up to three others **join** from their own machines.
+The connection goes through **ssh**; the game itself never opens a port to the
+network.
+
+**Hosting.** Game > Host a Network Game. Choose the strength of the computer
+player, the length of the game, the rules and a port (1904 by default; it is
+only reachable from the host's own machine). A waiting room lists who has
+joined; press **Start Game** when everyone is in.
+
+**Joining.** Game > Join a Network Game, and enter the host's machine the way
+ssh wants it: `host` or `user@host`, plus `:port` if the host chose another
+port than 1904. You see the same board and the same dialogs as at the host; on
+your turn the Roll / Build / Trade buttons work. The menus and dialogs say whose
+turn it is.
+
+**The table.**
+
+- Four players at most: the host and three joiners. A fifth player who tries to
+  join is turned away with a warning ("The table is full..."); so is anyone who
+  tries to join a game that has already started.
+- If fewer than four humans play, **one** computer player takes a free seat.
+  With four humans there is no computer player.
+- If a joiner's connection drops, a computer player (medium) takes over his
+  seat and the game goes on. If the host leaves, the game ends for everyone.
+
+**How it works.** The joiner's program runs
+
+```
+ssh -T -o BatchMode=yes user@host viola-landlord --relay 1904
+```
+
+On the host, ssh starts a second copy of viola-landlord as a *relay*, which
+connects to the hosting game on `127.0.0.1:1904` and copies messages both ways.
+The host runs the only real game; joiners draw what it sends and answer its
+questions. `BatchMode=yes` means ssh will never stop to ask for a password, so
+**password-less (key) access is required**. The protocol is described in
+`src/net.h`.
+
+#### Setting up password-less ssh
+
+The game assumes each joiner can already ssh to the host without typing a
+password; it does not set this up for you. The usual way, on **each joiner's
+machine**:
+
+1. The host needs an ssh server running (`sudo apt install openssh-server`
+   on Debian/Ubuntu; on NetBSD, `sshd=YES` in `/etc/rc.conf`).
+2. Make a key pair if you have none. Press Enter for an empty passphrase, or
+   choose a passphrase and load the key into `ssh-agent` (`ssh-add`) before
+   playing:
+
+   ```
+   ssh-keygen -t ed25519
+   ```
+
+3. Install the public key on the host (this asks for the host password one last
+   time):
+
+   ```
+   ssh-copy-id user@host
+   ```
+
+   Without `ssh-copy-id`, append `~/.ssh/id_ed25519.pub` to
+   `~/.ssh/authorized_keys` on the host by hand.
+4. Accept the host's key once with a plain `ssh user@host`, then check that
+   this prints the version **without asking anything**:
+
+   ```
+   ssh -o BatchMode=yes user@host viola-landlord --version
+   ```
+
+If step 4 fails:
+
+- "Permission denied": the key is not in the host's
+  `~/.ssh/authorized_keys`, or the permissions are too open (`chmod 700 ~/.ssh`
+  and `chmod 600 ~/.ssh/authorized_keys` on the host).
+- "Host key verification failed": do the plain `ssh user@host` once.
+- "command not found": non-interactive ssh does not see the host's PATH (for
+  instance `/usr/local/bin`). Either fix the PATH for non-interactive shells on
+  the host, or set `net_command = /usr/local/bin/viola-landlord` (the full path
+  on the host) in the joiner's `~/.config/viola-landlord/preferences.conf`.
+- Every machine needs the **same version** of Viola the Landlord; a different
+  version is turned away with a message.
+
+To use a different user name, port or key for ssh, put a `Host` entry in the
+joiner's `~/.ssh/config`; the game uses whatever ssh does.
 
 On your turn press **Roll Dice** (Space or Enter). Whenever the rules give you
 a choice, a dialog asks: buying a lot and bidding for one, paying the Jail fine
@@ -113,7 +190,10 @@ player lands on an unowned card), **Confirm Each Computer Move** (wait for a key
 after every computer turn). They are kept in
 `~/.config/viola-landlord/preferences.conf` (`$XDG_CONFIG_HOME` is honored),
 with the seats as `seat1` .. `seat4` (`empty`, `human`, `easy`, `medium`,
-`hard`) and the human names as `name1` .. `name4`. A 0.0.1 file is converted.
+`hard`) and the human names as `name1` .. `name4`; for network play
+`net_host` (the last host joined), `net_port` (the port to host on),
+`net_command` (the program ssh runs on the host, normally `viola-landlord`) and
+`net_cpu` (the hosted game's computer player). A 0.0.1 file is converted.
 
 ## The rules as implemented
 
@@ -197,7 +277,8 @@ Only public-domain material or art made for this program is used:
 | `src/game.c` | the rules engine (no X): turns, money, the Single Tax |
 | `src/ai.c` | the computer players, Easy / Medium / Hard |
 | `src/human.c` | the human players' choices, as dialogs; trades between humans |
-| `src/net.c` | network play: the protocol's message format, the network seat; socket stubs |
+| `src/net.c` | network play: localhost listener, ssh-started relay, joiner's ssh pipe, protocol, network seats |
+| `src/netui.c` | network play's windows: host setup and waiting room, Join, the joiner's game |
 | `src/view.c` | drawing the board and the panel |
 | `src/ui.c` | Viola dialogs: messages, lists, check lists, forms, number entry |
 | `src/menubar.c` | the Viola menu bar |
@@ -207,7 +288,7 @@ Only public-domain material or art made for this program is used:
 | `src/prefs.c` | the preferences file |
 | `src/main.c` | start-up, the main loop, the commands |
 | `tests/engine.c` | `make check`: computer-only games and consistency checks |
-| `tests/net.c` | `make check`: the network message format and network seats |
+| `tests/net.c` | `make check`: network games end to end through a stand-in for ssh (table limit, no CPU with four humans, dropped players) |
 
 ## License
 

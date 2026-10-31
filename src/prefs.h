@@ -45,6 +45,11 @@ typedef struct {
     int ask_bids;           /* ask the human to bid when a computer player lands on an unowned card */
     int confirm_cpu;        /* wait for a key after each computer move */
     int speed;              /* 0 fast, 1 normal, 2 slow: the pause between computer moves */
+    /* Network play (net.h). */
+    char net_host[128];     /* the last host joined: [user@]host[:port] */
+    int net_port;           /* the port a hosted game listens on (localhost only) */
+    char net_command[128];  /* the program ssh runs on the host for the relay */
+    int net_cpu;            /* SEAT_EASY..SEAT_HARD: the computer player in a hosted game */
 } Prefs;
 
 /* The seat's difficulty (DIFF_*) if it is a computer player, else -1. */

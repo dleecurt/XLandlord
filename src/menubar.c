@@ -64,6 +64,7 @@ static const Menu menus[NMENUS] = {
         { "&How to Play",              "F1",     CMD_HELP_PLAY,    NULL, NULL },
         { "The &Rules of 1906",        NULL,     CMD_HELP_RULES,   NULL, NULL },
         { "&Lizzie Magie and the Game", NULL,    CMD_HELP_HISTORY, NULL, NULL },
+        { "&Network Play",             NULL,     CMD_HELP_NETWORK, NULL, NULL },
         { "&Keyboard",                 NULL,     CMD_HELP_KEYS,    NULL, NULL },
         { "Li&cense",                  NULL,     CMD_LICENSE,      NULL, NULL },
         { "&About",                    NULL,     CMD_ABOUT,        NULL, NULL } } },

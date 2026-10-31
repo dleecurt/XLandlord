@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.0.3 - 2026-10-31
+
+- Network play over ssh. One player hosts (Game > Host a Network Game) and
+  up to three join (Game > Join a Network Game, giving `[user@]host`). The
+  joiner's game runs `ssh -T -o BatchMode=yes host viola-landlord --relay
+  PORT`; the relay connects to the hosting game, which listens on localhost
+  only. Password-less ssh keys are assumed; README.md and Help > Network Play
+  explain how to set them up.
+- Four players at most: a fifth who tries to join is turned away with a
+  warning, as is anyone joining a game already under way.
+- One computer player takes a free seat when fewer than four humans play;
+  four humans play with no computer player.
+- A waiting room for the host (who has joined, Start Game) and for joiners.
+- Joiners see the same board and dialogs; their builds, trades, sales,
+  Single Tax proposals and throws go to the host. Trades work between
+  players on different machines.
+- A joiner whose connection drops is replaced by a computer player (medium).
+- New preferences: `net_host`, `net_port`, `net_command`, `net_cpu`.
+- `tests/net` now plays whole network games through a stand-in for ssh.
+
 ## 0.0.2 - 2026-10-31
 
 - Local (hot-seat) multiplayer: the New Game form now has four seats, each

@@ -38,4 +38,14 @@ int human_accepts_purchase(Game *g, int buyer, int seller, int sp, int price);
  * show the list of things p can sell; returns 1 if something was sold. */
 int human_sell_menu(Game *g, int p, const char *title, const char *note, int need);
 
+/* The same list, only choosing: kind 1 a house, 2 to computer player
+ * `buyer` (at about `price`), 3 back to the pack. Returns 1 if chosen.
+ * (A joiner chooses on his screen; the host carries the sale out.) */
+int human_choose_sale(Game *g, int p, const char *title, const char *note, int need,
+                      int *kind, int *sp, int *buyer, int *price);
+
+/* Rule 12's question, choosing only: what to sell to find `need` dollars,
+ * or 0 to give up (Poor House). */
+int human_raise_choice(Game *g, int p, int need, int *kind, int *sp, int *buyer);
+
 #endif

@@ -1,0 +1,46 @@
+/*
+ * Viola the Landlord - The Landlord's Game for X11
+ * Copyright (C) 2026 Lee Curtis
+ *
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+/* netui.h - the window side of network play: the host's setup form and
+ * lobby, the joiner's Join dialog and waiting room, and the joiner's game
+ * (drawing what the host sends, answering its questions). */
+#ifndef NETUI_H
+#define NETUI_H
+
+#include "game.h"
+
+/* Keep the window alive while the program waits on the network. Returns 1
+ * if the player closed the window (and agreed to leave the game). */
+int  netui_idle(void);
+
+/* Host: the setup form, then the lobby until the host starts or cancels.
+ * Returns 1 with the table in *s (net_build_table) when the game should
+ * begin; the caller creates it and calls net_start_game. */
+int  netui_host_setup(GameSettings *s);
+
+/* Join: ask for the host, connect through ssh, wait in the lobby. Returns 1
+ * when the host has started the game (app.game is set up for drawing). */
+int  netui_join(void);
+
+/* Joiner: handle what the host has sent (state, records, questions, turns,
+ * notes, the end), waiting at most ms for the first message. */
+void netui_client_pump(int ms);
+
+#endif

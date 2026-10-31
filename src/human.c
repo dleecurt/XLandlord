@@ -32,11 +32,11 @@
 
 static const char *nm(const Game *g, int p) { return g->pl[p].name; }
 
+/* Humans sharing this screen (remote players have their own). */
 static int humans(const Game *g)
 {
-    int n = 0;
-    for (int q = 0; q < g->nplayers; q++) n += !g->pl[q].cpu;
-    return n;
+    (void)g;
+    return app_local_humans();
 }
 
 /* With several humans at one screen every dialog says whom it is asking:
@@ -245,7 +245,8 @@ static int h_st_build(Game *g, int p, int sp)
 
 typedef struct { int kind, sp, buyer, price; } Sale;   /* kind: 1 house, 2 to a player, 3 to the pack */
 
-int human_sell_menu(Game *g, int p, const char *title, const char *note, int need)
+int human_choose_sale(Game *g, int p, const char *title, const char *note, int need,
+                      int *kind, int *sp_out, int *buyer, int *price)
 {
     title = for_player(g, p, title);
     Sale sales[3 * NSPACES];
@@ -268,7 +269,7 @@ int human_sell_menu(Game *g, int p, const char *title, const char *note, int nee
         }
         if (best >= 0 && best_price > PACK_PRICE(sp)) {
             sales[n] = (Sale){ 2, sp, best, best_price };
-            snprintf(items[n], sizeof items[n], "Sell %s to %s  -  $%d", board[sp].name, nm(g, best), best_price);
+            snprintf(items[n], sizeof items[n], "Sell %s to %s  -  about $%d", board[sp].name, nm(g, best), best_price);
             n++;
         }
         sales[n] = (Sale){ 3, sp, -1, PACK_PRICE(sp) };
@@ -282,11 +283,38 @@ int human_sell_menu(Game *g, int p, const char *title, const char *note, int nee
     for (int i = 0; i < n; i++) ptr[i] = items[i];
     int i = ui_choose(title, note, ptr, n, 0);
     if (i < 0) return 0;
-    const char *err = sales[i].kind == 1 ? game_sell_house(g, p, sales[i].sp)
-                    : sales[i].kind == 2 ? game_trade(g, p, sales[i].buyer, sales[i].sp, sales[i].price)
-                    : game_sell_to_pack(g, p, sales[i].sp);
-    if (err) { ui_message(title, err); return 0; }
+    *kind = sales[i].kind;
+    *sp_out = sales[i].sp;
+    *buyer = sales[i].buyer;
+    *price = sales[i].price;
     return 1;
+}
+
+int human_sell_menu(Game *g, int p, const char *title, const char *note, int need)
+{
+    int kind, sp, buyer, price;
+    if (!human_choose_sale(g, p, title, note, need, &kind, &sp, &buyer, &price)) return 0;
+    const char *err = kind == 1 ? game_sell_house(g, p, sp)
+                    : kind == 2 ? game_trade(g, p, buyer, sp, price)
+                    : game_sell_to_pack(g, p, sp);
+    if (err) { ui_message(for_player(g, p, title), err); return 0; }
+    return 1;
+}
+
+int human_raise_choice(Game *g, int p, int need, int *kind, int *sp, int *buyer)
+{
+    char note[300];
+    int price;
+    snprintf(note, sizeof note,
+             "You must find $%d more (you have $%d). Choose something to sell. Cancel gives up: you pay what "
+             "you have and go to the %s.", need, g->pl[p].cash, g->single_tax ? "Natural Opportunity" : "Poor House");
+    for (;;) {
+        if (human_choose_sale(g, p, "Raising Money", note, need, kind, sp, buyer, &price)) return 1;
+        if (ui_yes_no(TT("Raising Money"), g->single_tax
+                          ? "Give up and rest on a Natural Opportunity?"
+                          : "Give up and go to the Poor House?", 0))
+            return 0;
+    }
 }
 
 static int h_raise(Game *g, int p, int need)
@@ -334,8 +362,10 @@ int human_accepts_sale(Game *g, int seller, int buyer, int sp, int price)
 {
     char text[400];
     int p = seller;
-    snprintf(text, sizeof text, "Pass the game to %s.\n\n%s offers you $%d for %s (sale price $%d). Sell it?",
-             nm(g, seller), nm(g, buyer), price, board[sp].name, board[sp].price);
+    char pass[64] = "";
+    if (humans(g) > 1) snprintf(pass, sizeof pass, "Pass the game to %s.\n\n", nm(g, seller));
+    snprintf(text, sizeof text, "%s%s offers you $%d for %s (sale price $%d). Sell it?",
+             pass, nm(g, buyer), price, board[sp].name, board[sp].price);
     static const char *const b[] = { "&Sell", "&Keep It" };
     return ask_at(sp, TT("An Offer"), text, b, 2, 1, 1) == 0;
 }
@@ -344,9 +374,10 @@ int human_accepts_purchase(Game *g, int buyer, int seller, int sp, int price)
 {
     char text[400];
     int p = buyer;
-    snprintf(text, sizeof text, "Pass the game to %s.\n\n%s offers to sell you %s for $%d (sale price $%d). "
-             "You have $%d. Buy it?", nm(g, buyer), nm(g, seller), board[sp].name, price, board[sp].price,
-             g->pl[buyer].cash);
+    char pass[64] = "";
+    if (humans(g) > 1) snprintf(pass, sizeof pass, "Pass the game to %s.\n\n", nm(g, buyer));
+    snprintf(text, sizeof text, "%s%s offers to sell you %s for $%d (sale price $%d). You have $%d. Buy it?",
+             pass, nm(g, seller), board[sp].name, price, board[sp].price, g->pl[buyer].cash);
     static const char *const b[] = { "&Buy", "&No Thanks" };
     return ask_at(sp, TT("An Offer"), text, b, 2, 1, 1) == 0;
 }

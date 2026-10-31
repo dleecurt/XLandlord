@@ -33,6 +33,7 @@ typedef struct {
     int cpu_running;        /* computer players are moving */
     int highlight;          /* a space to outline on the board, or -1 */
     int dice_rolling;       /* the dice are tumbling (drawn without numbers) */
+    int me;                 /* network joiner: my player number */
 } App;
 
 extern App app;
@@ -42,6 +43,9 @@ int app_can_act(void);
 int app_can_propose(void);
 int app_bids_on(void);
 int app_confirm_on(void);
+
+/* The humans who share this screen (1 for a network joiner). */
+int app_local_humans(void);
 
 /* The color of player p's checker and houses. */
 int app_player_color(int p);

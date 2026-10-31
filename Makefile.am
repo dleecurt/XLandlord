@@ -46,6 +46,7 @@ viola_landlord_SOURCES = \
 	src/human.c \
 	src/main.c \
 	src/menubar.c \
+	src/netui.c \
 	src/prefs.c \
 	src/ui.c \
 	src/view.c \
@@ -63,6 +64,7 @@ noinst_HEADERS = \
 	src/keys.h \
 	src/menubar.h \
 	src/net.h \
+	src/netui.h \
 	src/prefs.h \
 	src/ui.h \
 	src/util.h \

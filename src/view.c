@@ -43,6 +43,7 @@
 #include "app.h"
 #include "art.h"
 #include "menubar.h"
+#include "net.h"
 #include "ui.h"
 #include "util.h"
 #include "xwin.h"
@@ -483,8 +484,11 @@ static int draw_player(int p, int x, int y, int w)
     xw_disc(x + 9, y + 7, d, app_player_color(p));
     xw_circle(x + 9, y + 7, d, XC_INK);
     char buf[160];
-    snprintf(buf, sizeof buf, "%s%s%s%s", P->name, P->cpu ? " (" : "", P->cpu ? diff_names[CLAMP(P->difficulty, 0, 2)] : "",
-             P->cpu ? ")" : "");
+    const char *tag = "";
+    if (net_role() == NET_CLIENT && p == app.me) tag = " (you)";
+    else if (net_seat_remote(p) && !P->cpu) tag = " (network)";
+    snprintf(buf, sizeof buf, "%s%s%s%s%s", P->name, P->cpu ? " (" : "", P->cpu ? diff_names[CLAMP(P->difficulty, 0, 2)] : "",
+             P->cpu ? ")" : "", tag);
     xw_clip(x + 4, y + 4, w - 8, h - 8);
     xw_text(XF_UI, x + 15 + d, y + 6 + xw_ascent(XF_UI), buf, (int)strlen(buf), XC_INK);
     snprintf(buf, sizeof buf, "$%d", P->cash);
