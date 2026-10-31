@@ -75,7 +75,7 @@ enum { DIFF_EASY, DIFF_MEDIUM, DIFF_HARD };
 
 typedef struct {
     char name[NAME_LEN];
-    int cpu;                    /* 0 = the human at the keyboard */
+    int cpu;                    /* 0 = a human: at this screen (hot-seat) or, later, over the network */
     int difficulty;             /* DIFF_* for a computer player */
     int cash;
     int pos;                    /* space 0..39 */
@@ -168,8 +168,8 @@ struct Game {
 };
 
 typedef struct {
-    int nplayers;               /* 2..4: the human is player 0 unless all_cpu */
-    int all_cpu;                /* for tests: every player is a computer */
+    int nplayers;               /* 2..4 seats, in turn order */
+    int cpu[MAXPLAYERS];        /* 1 = a computer player, 0 = a human */
     int difficulty[MAXPLAYERS]; /* per player (the human's is ignored) */
     char names[MAXPLAYERS][NAME_LEN];
     int advanced;

@@ -24,16 +24,34 @@
 #ifndef PREFS_H
 #define PREFS_H
 
+/* Who sits in each of the four seats. */
+typedef enum {
+    SEAT_EMPTY,             /* nobody: the seat is skipped */
+    SEAT_HUMAN,             /* a human at this screen (hot-seat) */
+    SEAT_EASY,              /* computer players */
+    SEAT_MEDIUM,
+    SEAT_HARD,
+    SEAT_NETWORK,           /* a human on another machine: reserved for network play (net.h) */
+    SEAT_KINDS
+} SeatKind;
+
+#define NSEATS 4
+
 typedef struct {
-    char name[32];          /* the human player's name */
-    int difficulty;         /* DIFF_EASY / DIFF_MEDIUM / DIFF_HARD */
-    int opponents;          /* computer players, 1..3 */
+    int seat[NSEATS];       /* SeatKind of each seat, in turn order */
+    char names[NSEATS][32]; /* the names of the human seats */
     int end_wages;          /* the game ends at this many wages: 3, 5, 7 or 10 */
     int advanced;           /* the "advanced and scientific" rules */
     int ask_bids;           /* ask the human to bid when a computer player lands on an unowned card */
     int confirm_cpu;        /* wait for a key after each computer move */
     int speed;              /* 0 fast, 1 normal, 2 slow: the pause between computer moves */
 } Prefs;
+
+/* The seat's difficulty (DIFF_*) if it is a computer player, else -1. */
+int  prefs_seat_difficulty(int kind);
+/* The number of seats that are not empty, and of those that are human. */
+int  prefs_seats_used(const Prefs *p);
+int  prefs_humans(const Prefs *p);
 
 void prefs_defaults(Prefs *p);
 void prefs_load(Prefs *p);

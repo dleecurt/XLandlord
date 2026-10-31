@@ -52,6 +52,8 @@ static const Menu menus[NMENUS] = {
         { "Sell to the Pac&k...",      NULL,     CMD_SELL_PACK,  NULL, app_can_act },
         { "Propose the Single &Tax...", "X",     CMD_SINGLE_TAX, NULL, app_can_propose },
         { "&Standings",                "F2",     CMD_SCORES,     NULL, NULL },
+        { "&Host a Network Game...",   NULL,     CMD_NET_HOST,   NULL, NULL },
+        { "&Join a Network Game...",   NULL,     CMD_NET_JOIN,   NULL, NULL },
         { "&Quit",                     "Ctrl+Q", CMD_QUIT,       NULL, NULL } } },
     [MENU_OPTIONS] = { "Options", {
         { "&Game Settings...",         NULL,     CMD_SETTINGS,   NULL, NULL },

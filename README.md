@@ -44,15 +44,40 @@ needs GNU autoconf, automake and pkg-config.
 
 Without the 75dpi fonts the game still runs; X picks the nearest fonts it has.
 
-Current version: **0.0.1** (see `CHANGELOG.md`).
+Current version: **0.0.2** (see `CHANGELOG.md`).
 
 ## Playing
 
-A new game starts with the **New Game** form: the difficulty (Easy, Medium,
-Hard), one to three computer players, how many times a player draws his wages
-before the game ends (the 1906 rules say five) and the rules (standard, or the
-1906 "advanced and scientific" rules). Then the cards are dealt (Rule 1) and
-you tick the ones you want to buy.
+A new game starts with the **New Game** form: four seats, each **Empty,
+Human, Easy, Medium or Hard** (two to four players, at least one human), how
+many times a player draws his wages before the game ends (the 1906 rules say
+five) and the rules (standard, or the 1906 "advanced and scientific" rules).
+Each human seat is asked for its player's name. Then the cards are dealt
+(Rule 1) and each player ticks the ones he wants to buy.
+
+### Several players at one screen (hot-seat)
+
+Make two or more seats Human. They take turns at the keyboard and mouse:
+
+- when the turn passes from one human to another, a **Pass the game to ...**
+  prompt says whose turn it is;
+- every question names the player it is for ("Lee: For Sale (Rule 7)"),
+  because some come up on other players' turns - bids, Single Tax votes, the
+  Trust, money owed to another player;
+- humans can trade with each other: **Buy a Card** offers a price to the
+  owner, who accepts or declines; **Sell a Card** lists the computer players'
+  offers and lets you name a price to any human.
+
+### Network play (not finished)
+
+Game > Host a Network Game and Join a Network Game are in place, but this
+version only explains that network play is not ready. The design and the
+protocol are written up in `src/net.h`: the host runs the only game and sends
+each remote player's questions to his machine; clients just draw the board and
+answer with the same dialogs. The message format and a network seat that the
+computer plays until its player connects are written and tested
+(`tests/net.c`); the sockets, the lobby and the client mode are the work left,
+listed there as TODO in order. The default port will be 1904.
 
 On your turn press **Roll Dice** (Space or Enter). Whenever the rules give you
 a choice, a dialog asks: buying a lot and bidding for one, paying the Jail fine
@@ -86,7 +111,9 @@ Options > Game Settings (also your name), Computer Speed (fast, normal,
 slow), **Ask Me to Bid** (off: you are never asked to bid when a computer
 player lands on an unowned card), **Confirm Each Computer Move** (wait for a key
 after every computer turn). They are kept in
-`~/.config/viola-landlord/preferences.conf` (`$XDG_CONFIG_HOME` is honored).
+`~/.config/viola-landlord/preferences.conf` (`$XDG_CONFIG_HOME` is honored),
+with the seats as `seat1` .. `seat4` (`empty`, `human`, `easy`, `medium`,
+`hard`) and the human names as `name1` .. `name4`. A 0.0.1 file is converted.
 
 ## The rules as implemented
 
@@ -169,7 +196,8 @@ Only public-domain material or art made for this program is used:
 | `src/board.c` | the board and the Chance cards, as data |
 | `src/game.c` | the rules engine (no X): turns, money, the Single Tax |
 | `src/ai.c` | the computer players, Easy / Medium / Hard |
-| `src/human.c` | the human player's choices, as dialogs |
+| `src/human.c` | the human players' choices, as dialogs; trades between humans |
+| `src/net.c` | network play: the protocol's message format, the network seat; socket stubs |
 | `src/view.c` | drawing the board and the panel |
 | `src/ui.c` | Viola dialogs: messages, lists, check lists, forms, number entry |
 | `src/menubar.c` | the Viola menu bar |
@@ -179,6 +207,7 @@ Only public-domain material or art made for this program is used:
 | `src/prefs.c` | the preferences file |
 | `src/main.c` | start-up, the main loop, the commands |
 | `tests/engine.c` | `make check`: computer-only games and consistency checks |
+| `tests/net.c` | `make check`: the network message format and network seats |
 
 ## License
 

@@ -36,6 +36,7 @@ CORE_SOURCES = \
 	src/ai.c \
 	src/board.c \
 	src/game.c \
+	src/net.c \
 	src/util.c
 
 viola_landlord_SOURCES = \
@@ -61,6 +62,7 @@ noinst_HEADERS = \
 	src/human.h \
 	src/keys.h \
 	src/menubar.h \
+	src/net.h \
 	src/prefs.h \
 	src/ui.h \
 	src/util.h \
@@ -107,9 +109,13 @@ install-data-hook:
 # ---- tests ----
 # tests/engine plays hundreds of games between the computer players and
 # checks the rules engine stays consistent and that the levels are in order.
-check_PROGRAMS = tests/engine
-TESTS = tests/engine
+# tests/net checks the network protocol's message format and that seats
+# left for absent network players are played by the computer.
+check_PROGRAMS = tests/engine tests/net
+TESTS = tests/engine tests/net
 tests_engine_SOURCES = tests/engine.c $(CORE_SOURCES)
 tests_engine_CFLAGS = $(WARN_CFLAGS) -I$(top_srcdir)/src
+tests_net_SOURCES = tests/net.c $(CORE_SOURCES)
+tests_net_CFLAGS = $(WARN_CFLAGS) -I$(top_srcdir)/src
 
 test: check

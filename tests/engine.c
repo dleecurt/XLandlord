@@ -63,11 +63,11 @@ static int play(int np, const int *diffs, unsigned long seed, int advanced, int 
     GameSettings s;
     memset(&s, 0, sizeof s);
     s.nplayers = np;
-    s.all_cpu = 1;
     s.advanced = advanced;
     s.end_wages = 5;
     s.seed = seed;
     for (int p = 0; p < np; p++) {
+        s.cpu[p] = 1;
         s.difficulty[p] = diffs[p];
         snprintf(s.names[p], NAME_LEN, "P%d", p);
     }

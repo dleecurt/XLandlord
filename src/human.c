@@ -32,6 +32,26 @@
 
 static const char *nm(const Game *g, int p) { return g->pl[p].name; }
 
+static int humans(const Game *g)
+{
+    int n = 0;
+    for (int q = 0; q < g->nplayers; q++) n += !g->pl[q].cpu;
+    return n;
+}
+
+/* With several humans at one screen every dialog says whom it is asking:
+ * "Lee: For Sale (Rule 7)". Four buffers, so a few can be alive at once. */
+static const char *for_player(const Game *g, int p, const char *title)
+{
+    static char buf[4][128];
+    static int k;
+    if (humans(g) < 2) return title;
+    k = (k + 1) % 4;
+    snprintf(buf[k], sizeof buf[k], "%s: %s", nm(g, p), title);
+    return buf[k];
+}
+#define TT(title) for_player(g, p, title)
+
 /* Ask with the space outlined on the board. */
 static int ask_at(int sp, const char *title, const char *text, const char *const *b, int n, int def, int esc)
 {
@@ -78,14 +98,14 @@ static void deal_buy(Game *g, int p, const int *cards, int n, int *want)
              "then OK. You have $%d. Every card counts 100 at the end of the game; the rules advise keeping "
              "$50 to $75 for expenses around the board.", g->pl[p].cash);
     for (;;) {
-        if (!ui_checklist("The Deal (Rule 1)", note, ptr, n, want, deal_footer)) {
+        if (!ui_checklist(TT("The Deal (Rule 1)"), note, ptr, n, want, deal_footer)) {
             memset(want, 0, sizeof *want * (size_t)n);
             return;
         }
         int total = 0;
         for (int i = 0; i < n; i++) if (want[i]) total += board[cards[i]].price;
         if (total <= g->pl[p].cash) return;
-        ui_message("The Deal", "You have not money enough for all of those cards.");
+        ui_message(TT("The Deal"), "You have not money enough for all of those cards.");
     }
 }
 
@@ -127,7 +147,7 @@ static int h_buy(Game *g, int p, int sp, int price, int high_bidder)
                  board[sp].type == T_SPECULATION ? "nobody holds the license"
                                                  : "you pay the charge into the Public Treasury");
     static const char *const b[] = { "&Buy", "&Pass" };
-    return ask_at(sp, "For Sale (Rule 7)", text, b, 2, 0, 1) == 0;
+    return ask_at(sp, TT("For Sale (Rule 7)"), text, b, 2, 0, 1) == 0;
 }
 
 static int h_max_bid(Game *g, int p, int sp, int min)
@@ -143,7 +163,7 @@ static int h_max_bid(Game *g, int p, int sp, int min)
     int v = 0;
     int save = app.highlight;
     app.highlight = sp;
-    int ok = ui_number("Bidding (Rule 7)", note, &v);
+    int ok = ui_number(TT("Bidding (Rule 7)"), note, &v);
     app.highlight = save;
     return ok && v >= min ? v : 0;
 }
@@ -157,7 +177,7 @@ static int h_jail_pay(Game *g, int p)
              "You are in Jail (turn %d of at most 3). Pay the $50 fine and throw, or try to throw a double "
              "(\"serving your time\")? You have $%d.", g->pl[p].jail_turns, g->pl[p].cash);
     static const char *const b[] = { "&Pay $50", "&Throw for a Double" };
-    return ui_ask("Jail (Rule 6)", text, b, 2, 1, -1) == 0;
+    return ui_ask(TT("Jail (Rule 6)"), text, b, 2, 1, -1) == 0;
 }
 
 static int h_use_pass(Game *g, int p, int with, int without)
@@ -173,7 +193,7 @@ static int h_use_pass(Game *g, int p, int with, int without)
     snprintf(b2, sizeof b2, "&Move Straight");
     const char *const b[] = { b1, b2 };
     (void)g;
-    return ask_at(with, "Railroad Pass (Rule 17)", text, b, 2, 0, -1) == 0;
+    return ask_at(with, TT("Railroad Pass (Rule 17)"), text, b, 2, 0, -1) == 0;
 }
 
 static int h_direction(Game *g, int p, int fwd, int back)
@@ -184,7 +204,7 @@ static int h_direction(Game *g, int p, int fwd, int back)
              "Between the Chances you may move either way. Forward to %s, or backward to %s?",
              board[fwd].name, board[back].name);
     static const char *const b[] = { "&Forward", "&Backward" };
-    return ask_at(fwd, "Which Way? (Rule 2)", text, b, 2, 0, -1) == 0;
+    return ask_at(fwd, TT("Which Way? (Rule 2)"), text, b, 2, 0, -1) == 0;
 }
 
 static int h_speculate(Game *g, int p)
@@ -197,7 +217,7 @@ static int h_speculate(Game *g, int p)
              "and wins nothing - or refuse to move and stay where you are?",
              broker != NOBODY && broker != p ? " to the broker" : "");
     static const char *const b[] = { "&Speculate", "Stay &Put" };
-    return ask_at(21, "Speculation (Rule 8)", text, b, 2, 0, -1) == 0;
+    return ask_at(21, TT("Speculation (Rule 8)"), text, b, 2, 0, -1) == 0;
 }
 
 static int h_luxury(Game *g, int p)
@@ -207,7 +227,7 @@ static int h_luxury(Game *g, int p)
              "LUXURY: pay $75 for a luxury card, which counts 100 at the end of the game? If you do without it "
              "you move backward instead, as far as you threw. You have $%d.", g->pl[p].cash);
     static const char *const b[] = { "&Buy the Luxury", "Move &Backward" };
-    return ask_at(g->pl[p].pos, "Luxury (Rule 13)", text, b, 2, 0, -1) == 0;
+    return ask_at(g->pl[p].pos, TT("Luxury (Rule 13)"), text, b, 2, 0, -1) == 0;
 }
 
 static int h_st_build(Game *g, int p, int sp)
@@ -218,7 +238,7 @@ static int h_st_build(Game *g, int p, int sp)
              "will collect $10 house rent from every other player who stops here. You have $%d.",
              board[sp].name, g->pl[p].cash);
     static const char *const b[] = { "&Build", "&No" };
-    return ask_at(sp, "Build (Single Tax Rule 4)", text, b, 2, 0, 1) == 0;
+    return ask_at(sp, TT("Build (Single Tax Rule 4)"), text, b, 2, 0, 1) == 0;
 }
 
 /* ---- raising money ---- */
@@ -227,6 +247,7 @@ typedef struct { int kind, sp, buyer, price; } Sale;   /* kind: 1 house, 2 to a 
 
 int human_sell_menu(Game *g, int p, const char *title, const char *note, int need)
 {
+    title = for_player(g, p, title);
     Sale sales[3 * NSPACES];
     char items[3 * NSPACES][120];
     const char *ptr[3 * NSPACES];
@@ -276,7 +297,7 @@ static int h_raise(Game *g, int p, int need)
              "you have and go to the %s.", need, g->pl[p].cash, g->single_tax ? "Natural Opportunity" : "Poor House");
     for (;;) {
         if (human_sell_menu(g, p, "Raising Money", note, need)) return 1;
-        if (ui_yes_no("Raising Money", g->single_tax
+        if (ui_yes_no(TT("Raising Money"), g->single_tax
                           ? "Give up and rest on a Natural Opportunity?"
                           : "Give up and go to the Poor House?", 0))
             return 0;
@@ -294,7 +315,7 @@ static int h_vote(Game *g, int p, int proposer)
              "deeds to lots are worth nothing (you hold %d), there are no taxes on necessities, the treasury buys "
              "the utilities for the public, builds free colleges and raises wages.\n\nDo you vote for it?",
              nm(g, proposer), lots);
-    return ui_yes_no("The Single Tax", text, 0);
+    return ui_yes_no(TT("The Single Tax"), text, 0);
 }
 
 static int h_join_trust(Game *g, int p, int other)
@@ -304,7 +325,30 @@ static int h_join_trust(Game *g, int p, int other)
     snprintf(text, sizeof text,
              "You and %s own all the railroads between you. Pool them in a TRUST? Every railroad fare becomes "
              "$40, and the two of you divide the profits.", nm(g, other));
-    return ui_yes_no("The Trust (Rule 9)", text, 1);
+    return ui_yes_no(TT("The Trust (Rule 9)"), text, 1);
+}
+
+/* ---- trades between humans ---- */
+
+int human_accepts_sale(Game *g, int seller, int buyer, int sp, int price)
+{
+    char text[400];
+    int p = seller;
+    snprintf(text, sizeof text, "Pass the game to %s.\n\n%s offers you $%d for %s (sale price $%d). Sell it?",
+             nm(g, seller), nm(g, buyer), price, board[sp].name, board[sp].price);
+    static const char *const b[] = { "&Sell", "&Keep It" };
+    return ask_at(sp, TT("An Offer"), text, b, 2, 1, 1) == 0;
+}
+
+int human_accepts_purchase(Game *g, int buyer, int seller, int sp, int price)
+{
+    char text[400];
+    int p = buyer;
+    snprintf(text, sizeof text, "Pass the game to %s.\n\n%s offers to sell you %s for $%d (sale price $%d). "
+             "You have $%d. Buy it?", nm(g, buyer), nm(g, seller), board[sp].name, price, board[sp].price,
+             g->pl[buyer].cash);
+    static const char *const b[] = { "&Buy", "&No Thanks" };
+    return ask_at(sp, TT("An Offer"), text, b, 2, 1, 1) == 0;
 }
 
 const Decider human_decider = {

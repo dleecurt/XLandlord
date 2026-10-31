@@ -16,12 +16,13 @@ the board game patented by Lizzie J. Magie in 1904 (US Patent 748,626)
 and the ancestor of Monopoly, by the rules published by the Economic Game
 Company of New York in 1906, including the
 .B Single Tax
-rules. You play against one to three computer players at an
+rules. Two to four players sit at the table: each seat is a human at this
+screen (players take turns at the keyboard) or a computer player at an
 .BR Easy ,
 .B Medium
 or
 .B Hard
-level. The window is drawn in the style of the Viola web browser: flat
+level. Network play is planned but not yet available. The window is drawn in the style of the Viola web browser: flat
 gray94 panels, raised bevels, black focus boxes, Helvetica menus.
 .PP
 The game ends when a player has drawn his wages five times (three, seven or
@@ -70,8 +71,11 @@ new game / quit
 .I $XDG_CONFIG_HOME/viola-landlord/preferences.conf
 (normally
 .IR ~/.config/viola-landlord/preferences.conf )
-your name, the difficulty, the number of computer players, the length of
-the game, the rules, and the options, as
+the seats
+.RI ( seat1 " .. " seat4 :
+empty, human, easy, medium, hard), the human players' names
+.RI ( name1 " .. " name4 ),
+the length of the game, the rules, and the options, as
 .I key = value
 lines.
 .SH ENVIRONMENT

@@ -37,6 +37,7 @@
 #include "human.h"
 #include "keys.h"
 #include "menubar.h"
+#include "net.h"
 #include "ui.h"
 #include "util.h"
 #include "version.h"
@@ -45,6 +46,7 @@
 
 App app;
 
+static int humans_in_game(const Game *g);
 static int quit_requested;
 static int final_shown;
 
@@ -95,7 +97,10 @@ static void hook_dice(Game *g, int d1, int d2)
 static void hook_chance(Game *g, int p, const char *text)
 {
     if (g->pl[p].cpu) return;
-    ui_message("Chance", text);
+    char title[64];
+    if (humans_in_game(g) > 1) snprintf(title, sizeof title, "%s: Chance", g->pl[p].name);
+    else snprintf(title, sizeof title, "Chance");
+    ui_message(title, text);
 }
 
 static void hook_pause(Game *g, int p)
@@ -122,20 +127,39 @@ static unsigned long time_seed(void)
     return (unsigned long)time(NULL) * 2654435761UL ^ (unsigned long)getpid();
 }
 
-static const char *const cpu_names[] = { "Lord Blueblood", "Mr. D. F. Hogg", "Mrs. Soakum" };
+static const char *const cpu_names[] = { "Lord Blueblood", "Mr. D. F. Hogg", "Mrs. Soakum", "Mr. Slambang" };
+
+static int humans_in_game(const Game *g)
+{
+    int n = 0;
+    for (int p = 0; p < g->nplayers; p++) n += !g->pl[p].cpu;
+    return n;
+}
+
+/* The human whose turn was last, for the "Pass to ..." prompt. */
+static int last_human = -1;
 
 static void start_game(void)
 {
     GameSettings s;
     memset(&s, 0, sizeof s);
-    s.nplayers = 1 + CLAMP(app.prefs.opponents, 1, 3);
     s.advanced = app.prefs.advanced;
     s.end_wages = app.prefs.end_wages;
     s.seed = (unsigned long)time_seed();
-    copy_str(s.names[0], NAME_LEN, app.prefs.name);
-    for (int p = 1; p < s.nplayers; p++) {
-        copy_str(s.names[p], NAME_LEN, cpu_names[p - 1]);
-        s.difficulty[p] = app.prefs.difficulty;
+    /* Empty seats are skipped; the others keep their order. */
+    int ncpu = 0, kinds[MAXPLAYERS];
+    for (int i = 0; i < NSEATS && s.nplayers < MAXPLAYERS; i++) {
+        int kind = app.prefs.seat[i];
+        if (kind == SEAT_EMPTY || kind == SEAT_NETWORK) continue;   /* (network seats: see net.h) */
+        int p = s.nplayers++;
+        kinds[p] = kind;
+        if (kind == SEAT_HUMAN) {
+            copy_str(s.names[p], NAME_LEN, app.prefs.names[i]);
+        } else {
+            s.cpu[p] = 1;
+            s.difficulty[p] = prefs_seat_difficulty(kind);
+            copy_str(s.names[p], NAME_LEN, cpu_names[ncpu++ % 4]);
+        }
     }
     game_new(&app.game, &s);
     Game *g = &app.game;
@@ -143,47 +167,74 @@ static void start_game(void)
     g->hooks.dice = hook_dice;
     g->hooks.chance = hook_chance;
     g->hooks.pause = hook_pause;
-    game_set_decider(g, 0, &human_decider);
-    for (int p = 1; p < g->nplayers; p++) game_set_decider(g, p, &ai_decider);
+    for (int p = 0; p < g->nplayers; p++)
+        game_set_decider(g, p, kinds[p] == SEAT_HUMAN ? &human_decider : &ai_decider);
     app.playing = 1;
     app.human_turn = 0;
     app.highlight = -1;
     final_shown = 0;
-    game_log(g, "A new game: %s against %d %s computer player%s; the game ends at %d wages%s.",
-             g->pl[0].name, g->nplayers - 1,
-             app.prefs.difficulty == DIFF_EASY ? "easy" : app.prefs.difficulty == DIFF_HARD ? "hard" : "medium",
-             g->nplayers > 2 ? "s" : "", g->end_wages, g->advanced ? ", advanced rules" : "");
+    last_human = -1;
+
+    char who[200] = "";
+    for (int p = 0; p < g->nplayers; p++) {
+        char one[64];
+        static const char *const dn[] = { "easy", "medium", "hard" };
+        if (g->pl[p].cpu) snprintf(one, sizeof one, "%s (%s)", g->pl[p].name, dn[CLAMP(g->pl[p].difficulty, 0, 2)]);
+        else snprintf(one, sizeof one, "%s", g->pl[p].name);
+        if (p) strncat(who, p == g->nplayers - 1 ? " and " : ", ", sizeof who - strlen(who) - 1);
+        strncat(who, one, sizeof who - strlen(who) - 1);
+    }
+    game_log(g, "A new game: %s; the game ends at %d wages%s.", who, g->end_wages,
+             g->advanced ? ", advanced rules" : "");
     view_set_status("The deal.");
     app.cpu_running = 1;
     game_deal(g);
     app.cpu_running = 0;
 }
 
-/* The settings form. Returns 1 if confirmed. */
+/* The settings form: who sits where, the length and the rules. Returns 1 if
+ * confirmed (and the seats make a table). */
 static int settings_form(const char *title, const char *ok)
 {
-    static const char *const diffs[] = { "Easy", "Medium", "Hard" };
-    static const char *const opps[] = { "1", "2", "3" };
+    static const char *const kinds[] = { "Empty", "Human", "Easy", "Medium", "Hard" };
     static const char *const lens[] = { "3", "5", "7", "10" };
     static const char *const rules[] = { "Standard", "Advanced" };
     static const int len_val[] = { 3, 5, 7, 10 };
     UiRow rows[] = {
-        { "Difficulty", diffs, 3 },
-        { "Computer players", opps, 3 },
+        { "Seat 1", kinds, 5 }, { "Seat 2", kinds, 5 }, { "Seat 3", kinds, 5 }, { "Seat 4", kinds, 5 },
         { "Game ends at wages", lens, 4 },
         { "Rules", rules, 2 },
     };
-    int sel[4] = { app.prefs.difficulty, app.prefs.opponents - 1, 1, app.prefs.advanced };
-    for (int i = 0; i < 4; i++) if (len_val[i] == app.prefs.end_wages) sel[2] = i;
-    if (!ui_form(title,
-                 "The 1906 rules end the game when a player has drawn his wages five times. The advanced rules "
-                 "double taxes and land rents as houses go up.",
-                 rows, 4, sel, ok))
-        return 0;
-    app.prefs.difficulty = sel[0];
-    app.prefs.opponents = sel[1] + 1;
-    app.prefs.end_wages = len_val[sel[2]];
-    app.prefs.advanced = sel[3];
+    int sel[6];
+    for (int i = 0; i < NSEATS; i++) sel[i] = app.prefs.seat[i] == SEAT_NETWORK ? SEAT_EMPTY : app.prefs.seat[i];
+    sel[4] = 1;
+    for (int i = 0; i < 4; i++) if (len_val[i] == app.prefs.end_wages) sel[4] = i;
+    sel[5] = app.prefs.advanced;
+    for (;;) {
+        if (!ui_form(title,
+                     "Seats play in order. Human seats share this screen and take turns at it; Easy, Medium and "
+                     "Hard are computer players. The 1906 rules end the game when a player has drawn his wages "
+                     "five times. The advanced rules double taxes and land rents as houses go up.",
+                     rows, 6, sel, ok))
+            return 0;
+        int used = 0, hum = 0;
+        for (int i = 0; i < NSEATS; i++) { used += sel[i] != SEAT_EMPTY; hum += sel[i] == SEAT_HUMAN; }
+        if (used >= 2 && hum >= 1) break;
+        ui_message(title, used < 2 ? "The Landlord's Game needs at least two players."
+                                   : "At least one seat must be a human player.");
+    }
+    for (int i = 0; i < NSEATS; i++) app.prefs.seat[i] = sel[i];
+    app.prefs.end_wages = len_val[sel[4]];
+    app.prefs.advanced = sel[5];
+    /* Names for the human seats (Enter keeps the one shown). */
+    for (int i = 0; i < NSEATS; i++) {
+        if (app.prefs.seat[i] != SEAT_HUMAN) continue;
+        char name[32], note[80];
+        copy_str(name, sizeof name, app.prefs.names[i]);
+        snprintf(note, sizeof note, "The name of the human player in seat %d:", i + 1);
+        if (ui_prompt("Player's Name", note, name, sizeof name) && name[0])
+            copy_str(app.prefs.names[i], sizeof app.prefs.names[i], name);
+    }
     prefs_save(&app.prefs);
     return 1;
 }
@@ -200,12 +251,6 @@ static void cmd_new_game(void)
 static void cmd_settings(void)
 {
     if (!settings_form("Game Settings", "OK")) return;
-    char name[32];
-    copy_str(name, sizeof name, app.prefs.name);
-    if (ui_prompt("Your Name", "The name you play under:", name, sizeof name) && name[0]) {
-        copy_str(app.prefs.name, sizeof app.prefs.name, name);
-        prefs_save(&app.prefs);
-    }
     if (app.playing) ui_message("Game Settings", "The new settings take effect in the next game.");
 }
 
@@ -216,17 +261,21 @@ static void cmd_speed(void)
     if (i >= 0) { app.prefs.speed = i; prefs_save(&app.prefs); }
 }
 
-/* ---- the human's own business ---- */
+/* ---- the business of the human whose turn it is ---- */
+
+/* The player acting now (the current player, who is human when these run). */
+static int me(void) { return app.game.cur; }
 
 static void cmd_build(void)
 {
     Game *g = &app.game;
+    int p = me();
     for (;;) {
         int sps[NSPACES], n = 0;
         char items[NSPACES][120];
         const char *ptr[NSPACES];
         for (int sp = 0; sp < NSPACES; sp++) {
-            if (!game_can_build(g, 0, sp)) continue;
+            if (!game_can_build(g, p, sp)) continue;
             snprintf(items[n], sizeof items[n], "%s  -  %d house%s now, rent $%d + $%d", board[sp].name,
                      g->houses[sp], g->houses[sp] == 1 ? "" : "s", game_land_rent(g, sp), 10 * g->houses[sp]);
             ptr[n] = items[n];
@@ -239,57 +288,76 @@ static void cmd_build(void)
         }
         char note[200];
         snprintf(note, sizeof note, "A house costs $100, counts 100 at the end, and adds $10 to the rent. "
-                 "You have $%d.", g->pl[0].cash);
+                 "%s has $%d.", g->pl[p].name, g->pl[p].cash);
         int i = ui_choose("Build a House (Rule 14)", note, ptr, n, 0);
         if (i < 0) return;
-        const char *err = game_build(g, 0, sps[i]);
+        const char *err = game_build(g, p, sps[i]);
         if (err) { ui_message("Build a House", err); return; }
     }
+}
+
+/* Can this card change hands between players? */
+static int tradable(const Game *g, int sp)
+{
+    return !(g->single_tax && board[sp].type == T_LOT) && !(g->houses[sp] && !g->single_tax);
+}
+
+/* Offer `price` to `seller` for card sp on behalf of `buyer`: a computer
+ * seller decides at once, a human seller is asked at this screen. */
+static void offer_to_buy(int buyer, int seller, int sp, int price)
+{
+    Game *g = &app.game;
+    int yes = g->pl[seller].cpu ? ai_accepts_sale(g, seller, sp, price)
+                                : human_accepts_sale(g, seller, buyer, sp, price);
+    char msg[200];
+    if (yes) {
+        game_trade(g, seller, buyer, sp, price);
+        snprintf(msg, sizeof msg, "%s accepts: %s goes to %s for $%d.", g->pl[seller].name, board[sp].name,
+                 g->pl[buyer].name, price);
+        ui_message("Sold", msg);
+    } else {
+        snprintf(msg, sizeof msg, "%s declines the offer of $%d for %s.", g->pl[seller].name, price, board[sp].name);
+        ui_message("Declined", msg);
+    }
+    if (humans_in_game(g) > 1 && !g->pl[seller].cpu) last_human = seller;    /* hand back to the buyer */
 }
 
 static void cmd_trade_buy(void)
 {
     Game *g = &app.game;
+    int p = me();
     int sps[NSPACES], n = 0;
     char items[NSPACES][120];
     const char *ptr[NSPACES];
     for (int sp = 0; sp < NSPACES; sp++) {
         int o = g->owner[sp];
-        if (o <= 0 || (g->single_tax && board[sp].type == T_LOT) || (g->houses[sp] && !g->single_tax)) continue;
+        if (o == NOBODY || o == p || !tradable(g, sp)) continue;
         snprintf(items[n], sizeof items[n], "%s  (%s)", board[sp].name, g->pl[o].name);
         ptr[n] = items[n];
         sps[n++] = sp;
     }
-    if (!n) { ui_message("Buy a Card", "The computer players hold no card they could sell you."); return; }
+    if (!n) { ui_message("Buy a Card", "The other players hold no card they could sell you."); return; }
     int i = ui_choose("Buy a Card from a Player", "Which card would you like to buy?", ptr, n, 0);
     if (i < 0) return;
     int sp = sps[i], o = g->owner[sp];
     int offer = board[sp].price;
     char note[300];
     snprintf(note, sizeof note, "How much do you offer %s for %s? (Sale price $%d; you have $%d.)",
-             g->pl[o].name, board[sp].name, board[sp].price, g->pl[0].cash);
+             g->pl[o].name, board[sp].name, board[sp].price, g->pl[p].cash);
     if (!ui_number("Your Offer", note, &offer) || offer <= 0) return;
-    if (offer > g->pl[0].cash) { ui_message("Your Offer", "You have not that much money."); return; }
-    if (ai_accepts_sale(g, o, sp, offer)) {
-        game_trade(g, o, 0, sp, offer);
-        char msg[200];
-        snprintf(msg, sizeof msg, "%s accepts: %s is yours for $%d.", g->pl[o].name, board[sp].name, offer);
-        ui_message("Sold", msg);
-    } else {
-        char msg[200];
-        snprintf(msg, sizeof msg, "%s declines your offer of $%d for %s.", g->pl[o].name, offer, board[sp].name);
-        ui_message("Declined", msg);
-    }
+    if (offer > g->pl[p].cash) { ui_message("Your Offer", "You have not that much money."); return; }
+    offer_to_buy(p, o, sp, offer);
 }
 
 static void cmd_trade_sell(void)
 {
     Game *g = &app.game;
+    int p = me();
     int sps[NSPACES], n = 0;
     char items[NSPACES][120];
     const char *ptr[NSPACES];
     for (int sp = 0; sp < NSPACES; sp++) {
-        if (g->owner[sp] != 0 || (g->single_tax && board[sp].type == T_LOT) || (g->houses[sp] && !g->single_tax)) continue;
+        if (g->owner[sp] != p || !tradable(g, sp)) continue;
         snprintf(items[n], sizeof items[n], "%s  (sale price $%d)", board[sp].name, board[sp].price);
         ptr[n] = items[n];
         sps[n++] = sp;
@@ -297,25 +365,60 @@ static void cmd_trade_sell(void)
     if (!n) { ui_message("Sell a Card", "You hold no card you can sell (lots with houses must be cleared first)."); return; }
     int i = ui_choose("Sell a Card to a Player", "Which card would you like to sell?", ptr, n, 0);
     if (i < 0) return;
-    int sp = sps[i], best = -1, best_price = 0;
-    for (int q = 1; q < g->nplayers; q++) {
-        int o = ai_offer_for(g, q, sp);
-        if (o > best_price) { best_price = o; best = q; }
+    int sp = sps[i];
+
+    /* The buyers: each computer player's own offer, or a human named with
+     * an asking price. */
+    char bitems[MAXPLAYERS][120];
+    const char *bptr[MAXPLAYERS];
+    int who[MAXPLAYERS], price[MAXPLAYERS], nb = 0;
+    for (int q = 0; q < g->nplayers; q++) {
+        if (q == p) continue;
+        if (g->pl[q].cpu) {
+            int o = ai_offer_for(g, q, sp);
+            if (o <= 0) continue;
+            snprintf(bitems[nb], sizeof bitems[nb], "%s offers $%d", g->pl[q].name, o);
+            price[nb] = o;
+        } else {
+            snprintf(bitems[nb], sizeof bitems[nb], "Offer it to %s at a price you name...", g->pl[q].name);
+            price[nb] = -1;
+        }
+        bptr[nb] = bitems[nb];
+        who[nb++] = q;
     }
-    if (best < 0) { ui_message("No Offers", "Nobody will make you an offer for that card just now."); return; }
-    char text[300];
-    snprintf(text, sizeof text, "%s offers you $%d for %s. Accept?", g->pl[best].name, best_price, board[sp].name);
-    if (ui_yes_no("An Offer", text, 0)) game_trade(g, 0, best, sp, best_price);
+    if (!nb) { ui_message("No Offers", "Nobody will make you an offer for that card just now."); return; }
+    char note[160];
+    snprintf(note, sizeof note, "Who should have %s?", board[sp].name);
+    int k = ui_choose("Sell a Card to a Player", note, bptr, nb, 0);
+    if (k < 0) return;
+    int q = who[k];
+    if (price[k] >= 0) {                        /* a computer player's offer: take it */
+        game_trade(g, p, q, sp, price[k]);
+        return;
+    }
+    int ask = board[sp].price;
+    snprintf(note, sizeof note, "Your price to %s for %s? (Sale price $%d; %s has $%d.)", g->pl[q].name,
+             board[sp].name, board[sp].price, g->pl[q].name, g->pl[q].cash);
+    if (!ui_number("Your Price", note, &ask) || ask <= 0) return;
+    if (ask > g->pl[q].cash) { ui_message("Your Price", "The buyer has not that much money."); return; }
+    if (human_accepts_purchase(g, q, p, sp, ask)) {
+        game_trade(g, p, q, sp, ask);
+        ui_message("Sold", "The sale is made.");
+    } else {
+        ui_message("Declined", "The offer is declined.");
+    }
+    last_human = q;
 }
 
 static void cmd_sell_pack(void)
 {
     Game *g = &app.game;
+    int p = me();
     char note[200];
     snprintf(note, sizeof note, "Cards go back to the pack for half their sale price, houses to the bank for "
-             "$50, or to a computer player at his offer. You have $%d.", g->pl[0].cash);
-    while (human_sell_menu(g, 0, "Sell", note, 0)) {
-        snprintf(note, sizeof note, "Sell anything else? You have $%d.", g->pl[0].cash);
+             "$50, or to a computer player at his offer. You have $%d.", g->pl[p].cash);
+    while (human_sell_menu(g, p, "Sell", note, 0)) {
+        snprintf(note, sizeof note, "Sell anything else? You have $%d.", g->pl[p].cash);
     }
 }
 
@@ -327,8 +430,9 @@ static void cmd_single_tax(void)
                    "builds colleges and raises wages.", 0))
         return;
     app.cpu_running = 0;
-    if (!game_propose_single_tax(&app.game, 0)) ui_message("The Single Tax", "The Single Tax is defeated.");
-    else ui_message("The Single Tax", "The Single Tax is in force!");
+    int ok = game_propose_single_tax(&app.game, me());
+    ui_message("The Single Tax", ok ? "The Single Tax is in force!" : "The Single Tax is defeated.");
+    last_human = -2;                            /* other humans voted: say whose turn it is again */
 }
 
 static void cmd_scores(const char *title)
@@ -358,8 +462,7 @@ static void cmd_scores(const char *title)
     snprintf(lines[k++], 120, "Turns played: %d.  Public Treasury: $%d.  Wages: $%d.", g->turn_no, g->treasury, g->wage);
     if (g->over) {
         snprintf(lines[k++], 120, " ");
-        snprintf(lines[k++], 120, "%s", order[0] == 0 ? "You are the winner - the millionaire!"
-                                                        : "The winner is the player at the top.");
+        snprintf(lines[k++], 120, "%s is the winner - the millionaire!", g->pl[order[0]].name);
     }
     for (int i = 0; i < k; i++) ptr[i] = lines[i];
     ptr[k] = NULL;
@@ -424,6 +527,27 @@ static void cmd_about(void)
                "Copyright (C) 2026 Lee Curtis. Free software under the GNU GPL, version 3 or later.");
 }
 
+/* Network play: the menus are in place; net.c says it is not ready yet. */
+static void cmd_net_host(void)
+{
+    char err[400];
+    int port = NET_PORT;
+    if (!ui_number("Host a Network Game", "The TCP port to listen on (players join with your address and this port):", &port))
+        return;
+    if (net_host(port, err, sizeof err) < 0) ui_message("Host a Network Game", err);
+}
+
+static void cmd_net_join(void)
+{
+    char host[128] = "", err[400];
+    if (!ui_prompt("Join a Network Game", "The host's address, as host or host:port:", host, sizeof host) || !host[0])
+        return;
+    int port = NET_PORT;
+    char *colon = strrchr(host, ':');
+    if (colon && !strchr(colon + 1, ']')) { *colon = '\0'; port = atoi(colon + 1); }
+    if (net_join(host, port, app.prefs.names[0], err, sizeof err) < 0) ui_message("Join a Network Game", err);
+}
+
 static void roll(void)
 {
     if (!app_can_act()) return;
@@ -443,6 +567,8 @@ static void run_command(Command c)
     case CMD_SELL_PACK:     if (app_can_act()) cmd_sell_pack(); break;
     case CMD_SINGLE_TAX:    if (app_can_propose()) cmd_single_tax(); break;
     case CMD_SCORES:        if (app.playing) cmd_scores("Standings"); break;
+    case CMD_NET_HOST:      cmd_net_host(); break;
+    case CMD_NET_JOIN:      cmd_net_join(); break;
     case CMD_QUIT:
         if (!app.playing || app.game.over || ui_yes_no("Quit", "Leave the game in progress?", 0)) quit_requested = 1;
         break;
@@ -471,9 +597,9 @@ static void update_status(void)
         view_set_status("The game is over: %s wins.", g->pl[game_leader(g)].name);
         view_set_focus(PB_SCORES);
     } else if (app.human_turn) {
-        const Player *P = &g->pl[0];
-        if (P->in_jail) view_set_status("Your turn - you are in Jail. Roll the dice.");
-        else view_set_status("Your turn, %s: build, trade, or roll the dice.", P->name);
+        const Player *P = &g->pl[g->cur];
+        if (P->in_jail) view_set_status("%s's turn - in Jail. Roll the dice.", P->name);
+        else view_set_status("%s's turn: build, trade, or roll the dice.", P->name);
         view_set_focus(PB_ROLL);
     } else {
         view_set_status("%s is thinking...", g->pl[g->cur].name);
@@ -569,7 +695,19 @@ int main(int argc, char **argv)
             app.cpu_running = 0;
             continue;
         }
-        if (app.playing && !g->over) app.human_turn = 1;
+        if (app.playing && !g->over) {
+            app.human_turn = 1;
+            /* Hot-seat: when the screen passes from one human to another,
+             * say so, so nobody answers someone else's questions. */
+            if (g->cur != last_human && humans_in_game(g) > 1) {
+                char msg[120];
+                update_status();
+                snprintf(msg, sizeof msg, "Pass the game to %s.\n\nIt is %s's turn.", g->pl[g->cur].name,
+                         g->pl[g->cur].name);
+                ui_message("Next Player", msg);
+            }
+            last_human = g->cur;
+        }
         if (app.playing && g->over && !final_shown) {
             final_shown = 1;
             app.human_turn = 0;

@@ -105,7 +105,7 @@ void game_new(Game *g, const GameSettings *s)
     for (int p = 0; p < g->nplayers; p++) {
         Player *P = &g->pl[p];
         snprintf(P->name, sizeof P->name, "%s", s->names[p][0] ? s->names[p] : "Player");
-        P->cpu = s->all_cpu || p > 0;
+        P->cpu = s->cpu[p] != 0;
         P->difficulty = s->difficulty[p];
         P->cash = start;
     }
