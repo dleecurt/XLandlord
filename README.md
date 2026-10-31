@@ -53,7 +53,7 @@ for printing. Both are installed in `$(prefix)/share/doc/viola-landlord`.
 
 Without the 75dpi fonts the game still runs; X picks the nearest fonts it has.
 
-Current version: **0.0.4** (see `CHANGELOG.md`).
+Current version: **0.0.5** (see `CHANGELOG.md`).
 
 ## Playing
 
@@ -83,16 +83,48 @@ One player **hosts** and up to three others **join** from their own machines.
 The connection goes through **ssh**; the game itself never opens a port to the
 network.
 
+**Starting up.** When the program starts it asks how you want to play:
+**Host a Network Game**, **Join a Network Game**, or **Play Here** (at this
+screen, against the computer or hot-seat). The same choices are in the Game
+menu at any time. To skip the question, start it with an option:
+
+```
+viola-landlord --host                 # host a network game
+viola-landlord --join 192.168.1.20    # join the game on that machine
+viola-landlord --join lee@gamebox     # ... by host name, as user lee
+viola-landlord --local                # play at this screen
+```
+
 **Hosting.** Game > Host a Network Game. Choose the strength of the computer
 player, the length of the game, the rules and a port (1904 by default; it is
 only reachable from the host's own machine). A waiting room lists who has
 joined; press **Start Game** when everyone is in.
 
-**Joining.** Game > Join a Network Game, and enter the host's machine the way
-ssh wants it: `host` or `user@host`, plus `:port` if the host chose another
-port than 1904. You see the same board and the same dialogs as at the host; on
-your turn the Roll / Build / Trade buttons work. The menus and dialogs say whose
-turn it is.
+**Hosting.** The waiting room shows how to reach this machine: its host name
+and its IP addresses (loopback and link-local addresses are left out), for
+example `lee@gamebox (or the IP address: 192.168.1.20 / 2001:db8::5)`.
+
+**Joining.** Join a Network Game, and enter the host's address. You see the
+same board and the same dialogs as at the host; on your turn the Roll / Build /
+Trade buttons work. The menus and dialogs say whose turn it is.
+
+**Giving the host's address.** Type the host's **IP address** (IPv4 such as
+`192.168.1.20`, or IPv6 such as `2001:db8::5`) or its **host name** (such as
+`gamebox` or `gamebox.example.org`). A name is looked up the way the system
+looks up every name: in the machine's **hosts file** (`/etc/hosts`) and in
+**DNS**, in the order `/etc/nsswitch.conf` gives. If the name is in neither, the
+game says so (*Host Not Found*) before trying ssh, and you can type the IP
+address instead or add a line such as
+
+```
+192.168.1.20   gamebox
+```
+
+to `/etc/hosts` (as root). Add `user@` in front to log in to the host as
+another user, and `:port` after it if the host chose another port than 1904;
+for an IPv6 address with a port, put the address in brackets:
+`lee@[2001:db8::5]:1905`. ssh is given the name as you typed it, so its
+`known_hosts` entry for that name keeps working.
 
 **The table.**
 

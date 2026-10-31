@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.0.5 - 2026-10-31
+
+- At start-up the game asks how to play: Host a Network Game, Join a
+  Network Game, or Play Here. `--host`, `--join HOST` and `--local` on the
+  command line skip the question.
+- Joining by IP address (IPv4 or IPv6) or by host name. Names are looked up
+  with the system resolver - the hosts file and DNS, as /etc/nsswitch.conf
+  orders them - before ssh is started; an unknown name gets a plain "Host
+  Not Found" with advice (use the IP address, or add it to /etc/hosts).
+  ssh is still given the name as typed, so known_hosts entries keep working.
+- Addresses may carry `user@` and `:port`; IPv6 with a port as
+  `[2001:db8::5]:1905`. Malformed addresses are refused with a reason.
+- The host's waiting room shows the machine's host name and its IP
+  addresses (loopback and link-local left out).
+- tests/net checks address parsing and lookups, and its robot players join
+  alternately by name and by IP address.
+
 ## 0.0.4 - 2026-10-31
 
 - INSTALL.md: a full build and install guide (packages for Debian/Ubuntu,

@@ -22,6 +22,8 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <ifaddrs.h>
+#include <netdb.h>
 #include <netinet/in.h>
 #include <signal.h>
 #include <stdio.h>
@@ -833,6 +835,146 @@ const Decider net_decider = {
     .pre_roll = nd_pre_roll,
 };
 
+/* ==== addresses ==== */
+
+int net_parse_address(const char *in, char *target, size_t tsize, char *host, size_t hsize,
+                      int *port, char *err, size_t errsize)
+{
+    char buf[256];
+    copy_str(buf, sizeof buf, in);
+    /* Trim blanks the player may have typed around it. */
+    char *s = buf;
+    while (*s == ' ' || *s == '\t') s++;
+    for (char *e = s + strlen(s); e > s && (e[-1] == ' ' || e[-1] == '\t'); ) *--e = '\0';
+    if (!*s) { snprintf(err, errsize, "Enter the host's IP address or host name."); return -1; }
+
+    char user[128] = "";
+    char *at = strrchr(s, '@');
+    if (at) {
+        *at = '\0';
+        copy_str(user, sizeof user, s);
+        s = at + 1;
+        if (!user[0]) { snprintf(err, errsize, "There is nothing before the @ (the user name)."); return -1; }
+    }
+    char *portstr = NULL;
+    if (*s == '[') {                            /* [IPv6]:port */
+        char *close_b = strchr(s, ']');
+        if (!close_b) { snprintf(err, errsize, "An IPv6 address in [ ] is missing its ]."); return -1; }
+        *close_b = '\0';
+        if (close_b[1] == ':') portstr = close_b + 2;
+        else if (close_b[1]) { snprintf(err, errsize, "Only :port may follow the ] of an IPv6 address."); return -1; }
+        s++;
+    } else {
+        char *first = strchr(s, ':'), *last = strrchr(s, ':');
+        if (first && first == last) { *first = '\0'; portstr = first + 1; }   /* host:port */
+        /* Two or more colons: a bare IPv6 address, which can carry no port. */
+    }
+    if (!*s) { snprintf(err, errsize, "The host's address is missing."); return -1; }
+    for (const char *p = s; *p; p++) {
+        if (*p == ' ' || *p == '/' || *p == '\\' || *p == ';' || *p == '\'' || *p == '"' || *p == '`' || *p == '$') {
+            snprintf(err, errsize, "\"%s\" is not a host name or an IP address.", s);
+            return -1;
+        }
+    }
+    if (portstr) {
+        char *end;
+        long v = strtol(portstr, &end, 10);
+        if (!*portstr || *end || v <= 0 || v > 65535) {
+            snprintf(err, errsize, "\"%s\" is not a port number (1 to 65535).", portstr);
+            return -1;
+        }
+        *port = (int)v;
+    }
+    copy_str(host, hsize, s);
+    if (user[0]) snprintf(target, tsize, "%s@%s", user, s);
+    else copy_str(target, tsize, s);
+    return 0;
+}
+
+/* One address as text. */
+static void addr_text(const struct sockaddr *sa, char *out, size_t size)
+{
+    out[0] = '\0';
+    if (getnameinfo(sa, sa->sa_family == AF_INET6 ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in),
+                    out, (socklen_t)size, NULL, 0, NI_NUMERICHOST) != 0)
+        out[0] = '\0';
+}
+
+int net_resolve(const char *host, char *found, size_t fsize, char *err, size_t errsize)
+{
+    struct addrinfo hints, *res = NULL;
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    found[0] = '\0';
+    /* An IP address first: no lookup is needed (or wanted) for those. */
+    hints.ai_flags = AI_NUMERICHOST;
+    int r = getaddrinfo(host, NULL, &hints, &res);
+    if (r != 0) {
+        hints.ai_flags = AI_ADDRCONFIG;
+        r = getaddrinfo(host, NULL, &hints, &res);
+    }
+    if (r != 0) {
+        if (r == EAI_NONAME || r == EAI_FAIL
+#ifdef EAI_NODATA
+            || r == EAI_NODATA
+#endif
+            )
+            snprintf(err, errsize,
+                     "The host name \"%s\" was not found. A name must be known to DNS or listed in this machine's "
+                     "hosts file (/etc/hosts), for example:\n\n    192.168.1.20   %s\n\nOr type the host's IP "
+                     "address instead.", host, host);
+        else if (r == EAI_AGAIN)
+            snprintf(err, errsize, "The host name \"%s\" could not be looked up just now (the DNS server did not "
+                     "answer). Try again, use the IP address, or list the name in /etc/hosts.", host);
+        else
+            snprintf(err, errsize, "The host name \"%s\" could not be looked up: %s.", host, gai_strerror(r));
+        return -1;
+    }
+    size_t at = 0;
+    for (struct addrinfo *a = res; a; a = a->ai_next) {
+        char one[INET6_ADDRSTRLEN + 8];
+        addr_text(a->ai_addr, one, sizeof one);
+        if (!one[0] || strstr(found, one)) continue;        /* (each address once) */
+        int n = snprintf(found + at, fsize - at, "%s%s", at ? ", " : "", one);
+        if (n < 0 || (size_t)n >= fsize - at) break;
+        at += (size_t)n;
+    }
+    freeaddrinfo(res);
+    return 0;
+}
+
+int net_local_addresses(char *out, size_t size)
+{
+    struct ifaddrs *list = NULL;
+    out[0] = '\0';
+    if (getifaddrs(&list) != 0) return 0;
+    int count = 0;
+    size_t at = 0;
+    for (int pass = 0; pass < 2; pass++) {              /* IPv4, then IPv6 */
+        int family = pass == 0 ? AF_INET : AF_INET6;
+        for (struct ifaddrs *i = list; i; i = i->ifa_next) {
+            if (!i->ifa_addr || i->ifa_addr->sa_family != family) continue;
+            if (family == AF_INET) {
+                const struct sockaddr_in *a = (const struct sockaddr_in *)i->ifa_addr;
+                if ((ntohl(a->sin_addr.s_addr) >> 24) == 127) continue;         /* loopback */
+            } else {
+                const struct sockaddr_in6 *a = (const struct sockaddr_in6 *)i->ifa_addr;
+                if (IN6_IS_ADDR_LOOPBACK(&a->sin6_addr) || IN6_IS_ADDR_LINKLOCAL(&a->sin6_addr)) continue;
+            }
+            char one[INET6_ADDRSTRLEN + 8];
+            addr_text(i->ifa_addr, one, sizeof one);
+            if (!one[0] || strstr(out, one)) continue;
+            int n = snprintf(out + at, size - at, "%s%s", at ? ", " : "", one);
+            if (n < 0 || (size_t)n >= size - at) { pass = 2; break; }
+            at += (size_t)n;
+            count++;
+        }
+    }
+    freeifaddrs(list);
+    return count;
+}
+
 /* ==== joining ==== */
 
 
@@ -874,6 +1016,15 @@ int net_join(const char *host, int port, const char *remote_cmd, const char *nam
 {
     net_close(NULL);
     signal(SIGPIPE, SIG_IGN);
+    /* The name must resolve (DNS or the hosts file) before ssh is tried, so
+     * the player gets a plain answer rather than ssh's. */
+    {
+        char target[256], bare[256], found[512];
+        int dummy_port = port;
+        if (net_parse_address(host, target, sizeof target, bare, sizeof bare, &dummy_port, err, errsize) < 0)
+            return -1;
+        if (net_resolve(bare, found, sizeof found, err, errsize) < 0) return -1;
+    }
     int sv[2];
     if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) < 0) {
         snprintf(err, errsize, "Cannot make a pipe for ssh: %s.", strerror(errno));
@@ -929,7 +1080,8 @@ int net_join(const char *host, int port, const char *remote_cmd, const char *nam
     usleep(200000);
     ssh_errors(why, sizeof why);
     if (why[0]) snprintf(err, errsize, "Could not join the game on %s: %s", host, why);
-    else snprintf(err, errsize, "Could not join the game on %s: no answer from it.", host);
+    else snprintf(err, errsize, "Could not join the game on %s: no answer from it. Is it reachable, and is a "
+                  "game being hosted there?", host);
     net_close(NULL);
     return -1;
 }

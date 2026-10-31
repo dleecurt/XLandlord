@@ -35,9 +35,11 @@ int  netui_idle(void);
  * begin; the caller creates it and calls net_start_game. */
 int  netui_host_setup(GameSettings *s);
 
-/* Join: ask for the host, connect through ssh, wait in the lobby. Returns 1
- * when the host has started the game (app.game is set up for drawing). */
-int  netui_join(void);
+/* Join: ask for the host (an IP address or a name found in DNS or the hosts
+ * file; `given`, from the command line, skips the question once), connect
+ * through ssh, wait in the lobby. Returns 1 when the host has started the
+ * game (app.game is set up for drawing). */
+int  netui_join(const char *given);
 
 /* Joiner: handle what the host has sent (state, records, questions, turns,
  * notes, the end), waiting at most ms for the first message. */

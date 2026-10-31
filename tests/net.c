@@ -25,7 +25,9 @@
  *   sshd would on the host. So every byte goes the real way:
  *   joiner -> "ssh" -> relay -> host's localhost socket.
  *
- *   1. the message format and the STATE encoding round-trip;
+ *   1. the message format and the STATE encoding round-trip; addresses:
+ *      IP addresses (v4 and v6), names, user@ and :port are understood, names
+ *      are looked up in the hosts file / DNS, unknown names refused;
  *   2. three joiners take seats; a fourth (the fifth human) is turned away
  *      with the "table is full" warning;
  *   3. with four humans the table has no computer player, and a whole game is
@@ -98,6 +100,51 @@ static void formats(void)
     CHECK(kind == 2 && sp == 38 && buyer == 3, "sale encoding");
 }
 
+/* ---- addresses: IP addresses, names, ports, users ---- */
+
+static void addresses(void)
+{
+    static const struct { const char *in, *target, *host; int port; } ok[] = {
+        { "192.168.1.20",             "192.168.1.20",      "192.168.1.20", 1904 },
+        { "lee@192.168.1.20:1905",    "lee@192.168.1.20",  "192.168.1.20", 1905 },
+        { "  gamebox  ",              "gamebox",           "gamebox",      1904 },
+        { "lee@gamebox:2000",         "lee@gamebox",       "gamebox",      2000 },
+        { "fe80::1",                  "fe80::1",           "fe80::1",      1904 },
+        { "[2001:db8::5]:1905",       "2001:db8::5",       "2001:db8::5",  1905 },
+        { "ann@[2001:db8::5]",        "ann@2001:db8::5",   "2001:db8::5",  1904 },
+    };
+    for (int i = 0; i < (int)(sizeof ok / sizeof ok[0]); i++) {
+        char target[256], host[256], err[300];
+        int p = 1904;
+        int r = net_parse_address(ok[i].in, target, sizeof target, host, sizeof host, &p, err, sizeof err);
+        CHECK(r == 0 && !strcmp(target, ok[i].target) && !strcmp(host, ok[i].host) && p == ok[i].port,
+              "address [%s] -> [%s] [%s] %d (%s)", ok[i].in, target, host, p, r ? err : "");
+    }
+    static const char *const bad[] = { "", "@host", "host:99999", "host:x", "[::1", "[::1]x", "a b", "host;rm" };
+    for (int i = 0; i < (int)(sizeof bad / sizeof bad[0]); i++) {
+        char target[256], host[256], err[300] = "";
+        int p = 1904;
+        CHECK(net_parse_address(bad[i], target, sizeof target, host, sizeof host, &p, err, sizeof err) < 0 && err[0],
+              "bad address [%s] accepted", bad[i]);
+    }
+    /* Lookups: an IP address as it is; a name from the hosts file; an
+     * unknown name refused with advice about DNS and /etc/hosts. */
+    char found[512], err[600];
+    CHECK(net_resolve("127.0.0.1", found, sizeof found, err, sizeof err) == 0 && strstr(found, "127.0.0.1"),
+          "resolve 127.0.0.1: %s", found);
+    CHECK(net_resolve("::1", found, sizeof found, err, sizeof err) == 0 && strstr(found, "::1"), "resolve ::1");
+    CHECK(net_resolve("localhost", found, sizeof found, err, sizeof err) == 0 && found[0],
+          "resolve localhost (from /etc/hosts): %s", err);
+    CHECK(net_resolve("no-such-host.invalid", found, sizeof found, err, sizeof err) < 0 && strstr(err, "/etc/hosts"),
+          "an unknown name was not refused with advice: [%s]", err);
+    char err2[600];
+    CHECK(net_join("no-such-host.invalid", NET_PORT, self, "Nobody", err2, sizeof err2) < 0 && strstr(err2, "not found"),
+          "joining an unknown name: [%s]", err2);
+    char mine[512];
+    net_local_addresses(mine, sizeof mine);
+    CHECK(!strstr(mine, "127.0.0.1"), "loopback listed among this machine's addresses: %s", mine);
+}
+
 /* ---- a robot joiner ---- */
 
 static int robot_idle(void) { return 0; }
@@ -109,7 +156,9 @@ static void robot(const char *name, int leave_after)
 {
     char err[1024];
     net_set_idle(robot_idle);
-    if (net_join("testhost", port, self, name, err, sizeof err) < 0)
+    /* Robots join alternately by name (found in /etc/hosts) and by IP address. */
+    const char *where = name[0] % 2 ? "localhost" : "127.0.0.1";
+    if (net_join(where, port, self, name, err, sizeof err) < 0)
         _exit(strstr(err, "table is full") ? 3 : 2);
     int me = -1, turns = 0;
     NetMsg m;
@@ -212,12 +261,13 @@ int main(int argc, char **argv)
     port = 20000 + (int)(getpid() % 20000);
 
     formats();
+    addresses();
 
     /* 5. nobody hosting: the relay's own message comes back. */
     {
         char err[1024];
         net_set_idle(robot_idle);
-        CHECK(net_join("testhost", port, self, "Early", err, sizeof err) < 0 && strstr(err, "no game is being hosted"),
+        CHECK(net_join("127.0.0.1", port, self, "Early", err, sizeof err) < 0 && strstr(err, "no game is being hosted"),
               "joining nobody: [%s]", err);
     }
 

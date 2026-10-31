@@ -16,6 +16,8 @@ local sizes = {
   ["which-way.png"]    = "85%",
   ["the-deal.png"]     = "55%",
   ["waiting-room.png"] = "70%",
+  ["start-up.png"]     = "90%",
+  ["host-not-found.png"] = "50%",
 }
 
 -- Size a picture by its file name.

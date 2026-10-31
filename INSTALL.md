@@ -65,8 +65,8 @@ A release tarball (`viola-landlord-X.Y.Z.tar.gz`) already contains the
 `configure` script, so you only need the build tools from section 1.
 
 ```
-tar xzf viola-landlord-0.0.4.tar.gz
-cd viola-landlord-0.0.4
+tar xzf viola-landlord-0.0.5.tar.gz
+cd viola-landlord-0.0.5
 ./configure
 make
 make check            # optional, about 10 seconds, needs no display
@@ -82,7 +82,7 @@ viola-landlord
 `configure` ends with a summary, for example:
 
 ```
-  Viola the Landlord 0.0.4 is configured:
+  Viola the Landlord 0.0.5 is configured:
     compiler:        gcc
     X11:             -lX11
     install prefix:  /usr/local
@@ -204,6 +204,12 @@ the system's `ssh` program. At run time:
 - **The host** needs an ssh server running (`sudo apt install openssh-server`,
   or `sshd=YES` in NetBSD's `/etc/rc.conf`). The game listens on
   `127.0.0.1` only (port 1904 by default), so no firewall port needs opening.
+- **Each joiner** must be able to reach the host by its **IP address** or by
+  a **host name** that its machine can look up: in DNS, or in its own
+  `/etc/hosts` (a line such as `192.168.1.20   gamebox`). The game looks the
+  name up with the system resolver (`getaddrinfo`, which follows
+  `/etc/nsswitch.conf`) and says plainly when a name is not found. The host's
+  waiting room lists its name and IP addresses.
 - **Each joiner** needs the ssh client and password-less (key) access to the
   host. `README.md` ("Setting up password-less ssh") and Help > Network Play
   walk through it; the check is:
@@ -283,6 +289,11 @@ The test opens a port on `127.0.0.1` between 20000 and 40000 and runs copies
 of itself as joiners. A sandbox that forbids local sockets or `fork()` will
 make it fail; run it outside the sandbox. Its output names the check that
 failed.
+
+**Network play: "Host Not Found"**
+The name typed is in neither DNS nor `/etc/hosts` on the joiner's machine.
+Type the host's IP address instead (the host's waiting room shows it), or add
+the name to `/etc/hosts`. `getent hosts NAME` shows what the system finds.
 
 **Network play: "Could not join ... Permission denied (publickey)"** and
 other ssh messages: ssh's own error is shown as it is; see section 8 and the

@@ -746,10 +746,37 @@ static void cmd_net_join(void)
         return;
     leave_network("The host has left the game.");
     app.playing = 0;
-    netui_join();
+    netui_join(NULL);
 }
 
 /* Roll Dice: play the current human's turn (a joiner asks the host to). */
+/* The first question at start-up: host a network game, join one, or play
+ * at this screen. `mode` comes from the command line (--host, --join,
+ * --local) and skips the question; `join_host` is --join's host. */
+typedef enum { START_ASK, START_HOST, START_JOIN, START_LOCAL } StartMode;
+
+static void start_up(StartMode mode, const char *join_host)
+{
+    if (mode == START_ASK) {
+        static const char *const b[] = { "&Host a Network Game", "&Join a Network Game", "&Play Here", "&Quit" };
+        int i = ui_ask("Viola the Landlord",
+                       "Welcome to The Landlord's Game.\n\n"
+                       "Host a Network Game: you run the game here and up to three players join from their own "
+                       "machines over ssh.\n"
+                       "Join a Network Game: play in a game someone else is hosting (by its IP address or host "
+                       "name).\n"
+                       "Play Here: play at this screen, against the computer or with others taking turns.",
+                       b, 4, 2, 2);
+        mode = i == 0 ? START_HOST : i == 1 ? START_JOIN : i == 2 ? START_LOCAL : START_ASK;
+        if (i == 3) { quit_requested = 1; return; }
+    }
+    switch (mode) {
+    case START_HOST:  start_network_game(); break;
+    case START_JOIN:  netui_join(join_host); break;
+    default:          cmd_new_game(); break;
+    }
+}
+
 static void roll(void)
 {
     if (!app_can_act()) return;
@@ -877,14 +904,31 @@ int main(int argc, char **argv)
 {
     /* Started by a joiner's ssh on the host's machine: be the relay. */
     if (argc == 3 && !strcmp(argv[1], "--relay")) return net_relay(atoi(argv[2]));
+    StartMode mode = START_ASK;
+    const char *join_host = NULL;
     for (int i = 1; i < argc; i++) {
+        if (!strcmp(argv[i], "--host")) { mode = START_HOST; continue; }
+        if (!strcmp(argv[i], "--local")) { mode = START_LOCAL; continue; }
+        if (!strcmp(argv[i], "--join")) {
+            if (i + 1 >= argc) { fprintf(stderr, "viola-landlord: --join needs the host (an IP address or a name)\n"); return 2; }
+            mode = START_JOIN;
+            join_host = argv[++i];
+            continue;
+        }
         if (!strcmp(argv[i], "--version") || !strcmp(argv[i], "-v")) {
             printf("viola-landlord %s\n", PACKAGE_VERSION_STR);
             return 0;
         }
         if (!strcmp(argv[i], "--help") || !strcmp(argv[i], "-h")) {
-            printf("usage: viola-landlord [--version] [--help]\n"
+            printf("usage: viola-landlord [--host | --join [USER@]HOST[:PORT] | --local]\n"
+                   "       viola-landlord --version | --help\n"
                    "       viola-landlord --relay PORT   (run by ssh for network play; not by hand)\n"
+                   "\n"
+                   "  --host     host a network game (others join over ssh)\n"
+                   "  --join H   join the game hosted on H: an IP address, or a host name found\n"
+                   "             in DNS or /etc/hosts; [IPv6]:port for IPv6 with a port\n"
+                   "  --local    play at this screen (against the computer, or hot-seat)\n"
+                   "  With none of these, the game asks at start-up.\n"
                    "The Landlord's Game (Lizzie J. Magie, 1904) against the computer, for X11.\n"
                    "Settings are kept in ~/.config/viola-landlord/preferences.conf.\n");
             return 0;
@@ -900,7 +944,7 @@ int main(int argc, char **argv)
     update_status();
     view_draw();
     xw_flush();
-    cmd_new_game();                     /* straight to the New Game form */
+    start_up(mode, join_host);          /* host, join, or play here? */
 
     net_set_idle(netui_idle);
     while (!quit_requested) {

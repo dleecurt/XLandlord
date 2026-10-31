@@ -3,7 +3,7 @@
 *Lizzie J. Magie's game of 1904, by the rules of 1906, with the Single Tax,
 for one to four players at one screen or over the network.*
 
-Viola the Landlord 0.0.4. Copyright (C) 2026 Lee Curtis. This document is
+Viola the Landlord 0.0.5. Copyright (C) 2026 Lee Curtis. This document is
 part of the program and is free under the GNU General Public License,
 version 3 or later; the rules it describes are those of the public-domain 1904
 patent and 1906 rule book.
@@ -82,8 +82,22 @@ than the money you paid, before it collects a single rent.
 
 ## 3. Starting a game
 
-When the program starts it shows the **New Game** form (Game > New Game,
-Ctrl+N, at any time).
+When the program starts it asks how you want to play:
+
+![The first question: host, join, or play here.](images/start-up.png)
+
+- **Host a Network Game**: you run the game and up to three players join
+  from their own machines (section 18).
+- **Join a Network Game**: you play in a game someone else is hosting
+  (section 18).
+- **Play Here**: you play at this screen, against the computer or with others
+  taking turns. This opens the **New Game** form described below.
+
+The same choices are in the Game menu at any time (Game > New Game is *Play
+Here*; Ctrl+N). From a terminal, `viola-landlord --host`, `--join HOST` or
+`--local` skips the question.
+
+The **New Game** form:
 
 ![The New Game form.](images/new-game.png)
 
@@ -467,9 +481,32 @@ waiting room shows who has joined; press **Start Game** when everyone is in.
 
 ![The host's waiting room.](images/waiting-room.png)
 
-**To join:** Game > Join a Network Game, and give the host's machine as ssh
-would: `host` or `user@host`, with `:port` if the host chose another port. You
-see the same board and the same dialogs, and on your turn the buttons work.
+The waiting room also shows how to reach the host: its name and its IP
+addresses.
+
+**To join:** Join a Network Game (at start-up, or in the Game menu), and type
+the host's address. You see the same board and the same dialogs, and on your
+turn the buttons work.
+
+**Giving the host's address.** Type the host's **IP address** (IPv4 such as
+`192.168.1.20`, or IPv6 such as `2001:db8::5`) or its **host name** (such as
+`gamebox` or `gamebox.example.org`). A name is looked up the way the system
+looks up every name: in the machine's **hosts file** (`/etc/hosts`) and in
+**DNS**, in the order `/etc/nsswitch.conf` gives. If the name is in neither, the
+game says so (*Host Not Found*) before trying ssh, and you can type the IP
+address instead or add a line such as
+
+```
+192.168.1.20   gamebox
+```
+
+to `/etc/hosts` (as root). Add `user@` in front to log in to the host as
+another user, and `:port` after it if the host chose another port than 1904;
+for an IPv6 address with a port, put the address in brackets:
+`lee@[2001:db8::5]:1905`. ssh is given the name as you typed it, so its
+`known_hosts` entry for that name keeps working.
+
+![A name that is in neither DNS nor the hosts file.](images/host-not-found.png)
 
 ![A joiner's screen: "Ann (you)" playing on her own machine.](images/joiner-view.png)
 
@@ -510,6 +547,10 @@ connection runs inside ssh.
 | Esc, F9, F10 | the menu bar; Alt+G, Alt+O, Alt+H open a menu |
 | Ctrl+N | new game |
 | Ctrl+Q | quit |
+
+From a terminal: `viola-landlord --host` hosts a network game,
+`viola-landlord --join HOST` joins one (HOST as in section 18),
+`viola-landlord --local` plays at this screen; with none of them the game asks.
 
 In dialogs, Enter presses the button with the black focus box; Tab and the
 arrow keys move it; Esc backs out; an underlined letter presses its button; in

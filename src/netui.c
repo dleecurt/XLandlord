@@ -58,19 +58,34 @@ int netui_idle(void)
 
 /* ---- hosting ---- */
 
+/* How joiners can reach this machine: the host name and the IP addresses,
+ * e.g. "lee@gamebox or lee@192.168.1.20 / 2001:db8::5". */
 static void this_address(char *out, size_t size)
 {
-    char host[256] = "this-machine";
+    char host[256] = "this-machine", ips[400];
     gethostname(host, sizeof host - 1);
     const char *u = getenv("USER");
-    if (u && *u) snprintf(out, size, "%s@%s", u, host);
-    else snprintf(out, size, "%s", host);
+    char user[64] = "";
+    if (u && *u) snprintf(user, sizeof user, "%s@", u);
+    if (net_local_addresses(ips, sizeof ips) > 0) {
+        /* "a, b, c" -> "a / b / c", so the commas of the sentence stay clear */
+        char shown[500];
+        size_t o = 0;
+        for (const char *q = ips; *q && o + 4 < sizeof shown; q++) {
+            if (q[0] == ',' && q[1] == ' ') { memcpy(shown + o, " / ", 3); o += 3; q++; }
+            else shown[o++] = *q;
+        }
+        shown[o] = '\0';
+        snprintf(out, size, "%s%s (or the IP address: %s)", user, host, shown);
+    } else {
+        snprintf(out, size, "%s%s", user, host);
+    }
 }
 
 /* The lobby: who has joined, until Start or Cancel. */
 static int lobby(void)
 {
-    char addr[300], last_event[200] = "";
+    char addr[800], last_event[200] = "";
     this_address(addr, sizeof addr);
     for (;;) {
         net_host_poll(0);
@@ -79,13 +94,14 @@ static int lobby(void)
 
         int lh = xw_line_height(XF_UI);
         int w = MIN(620, xw_width() - 40);
-        char note[600], buf[1200];
+        char note[1400], buf[1600];
         const char *lines[16];
         snprintf(note, sizeof note,
-                 "Players join from their own machines with Game > Join a Network Game, entering %s%s%d "
-                 "(the game is reached through ssh; see Help > Network Play). Four players at most: a fifth "
-                 "is turned away. If fewer than four humans play, one computer player takes a free seat.",
-                 addr, ":", app.prefs.net_port);
+                 "Players join from their own machines with Join a Network Game, entering %s%s "
+                 "(a name works if their machine finds it in DNS or its hosts file). The game is reached through "
+                 "ssh; see Help > Network Play. Four players at most: a fifth is turned away. If fewer than four "
+                 "humans play, one computer player takes a free seat.",
+                 addr, app.prefs.net_port == NET_PORT ? "" : " with the port after a colon");
         int nn = ui_wrap(XF_UI, note, w - 2 * UI_MARGIN, buf, sizeof buf, lines, 16);
         int rows = MAXPLAYERS + 2;
         int h = 2 * UI_MARGIN + lh + 12 + nn * lh + 12 + rows * (lh + 6) + 14 + UI_BUTTON_H;
@@ -376,20 +392,37 @@ static int waiting_room(void)
 }
 
 /* See netui.h: the host's address, ssh, then the waiting room. */
-int netui_join(void)
+int netui_join(const char *given)
 {
-    char host[128];
-    copy_str(host, sizeof host, app.prefs.net_host);
-    if (!ui_prompt("Join a Network Game",
-                   "The host's machine, as for ssh: host or user@host, with :port if the host chose another port "
-                   "than 1904. You need password-less ssh access to it (see Help > Network Play).",
-                   host, sizeof host) || !host[0])
-        return 0;
-    copy_str(app.prefs.net_host, sizeof app.prefs.net_host, host);
+    char typed[192], target[256], host[256], err[1200];
+    int port = NET_PORT;
+    copy_str(typed, sizeof typed, given && *given ? given : app.prefs.net_host);
+    for (;;) {
+        if (!given || !*given) {
+            if (!ui_prompt("Join a Network Game",
+                           "The host's IP address or host name (a name must be in DNS or in this machine's "
+                           "/etc/hosts). Put user@ in front to log in as another user, and :port after it if "
+                           "the host chose another port than 1904 (for IPv6, [address]:port). You need "
+                           "password-less ssh access to the host (see Help > Network Play).",
+                           typed, sizeof typed) || !typed[0])
+                return 0;
+        }
+        given = NULL;                       /* (asked again after a mistake) */
+        port = NET_PORT;
+        if (net_parse_address(typed, target, sizeof target, host, sizeof host, &port, err, sizeof err) < 0) {
+            ui_message("Join a Network Game", err);
+            continue;
+        }
+        char found[512];
+        if (net_resolve(host, found, sizeof found, err, sizeof err) < 0) {
+            ui_message("Host Not Found", err);
+            continue;
+        }
+        break;
+    }
+    copy_str(app.prefs.net_host, sizeof app.prefs.net_host, typed);
     prefs_save(&app.prefs);
-    int port = 1904;
-    char *colon = strrchr(host, ':');
-    if (colon) { *colon = '\0'; port = atoi(colon + 1); if (port <= 0 || port > 65535) port = 1904; }
+    copy_str(host, sizeof host, target);    /* ssh gets user@host, as typed */
 
     /* A note on screen while ssh connects (it can take a few seconds). */
     char msg[300];
@@ -399,7 +432,6 @@ int netui_join(void)
     xw_text(XF_UI, c.x, c.y + xw_ascent(XF_UI), msg, (int)strlen(msg), XC_INK);
     xw_flush();
 
-    char err[1200];
     if (net_join(host, port, app.prefs.net_command, app.prefs.names[0], err, sizeof err) < 0) {
         /* The table-full warning comes back here too. */
         ui_message(strstr(err, "table is full") ? "The Table Is Full" : "Join a Network Game", err);

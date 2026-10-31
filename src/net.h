@@ -201,10 +201,38 @@ void net_set_action_handler(int (*fn)(Game *g, int p, const NetMsg *m));
  * whose player is not connected is played by the computer (medium). */
 extern const Decider net_decider;
 
+/* ---- addresses ---- */
+
+/* Split what a player typed for the host - an IP address or a host name,
+ * with an optional user@ in front and an optional :port after:
+ *
+ *     192.168.1.20      lee@192.168.1.20:1905      gamebox      lee@gamebox:1905
+ *     fe80::1 (IPv6, no port)      [2001:db8::5]:1905      lee@[2001:db8::5]
+ *
+ * into the ssh target (user@host, as ssh wants it: an IPv6 address without
+ * brackets), the bare host and the port (`*port` is left alone when none is
+ * given). Returns 0, or -1 with the reason in err. */
+int net_parse_address(const char *in, char *target, size_t tsize, char *host, size_t hsize,
+                      int *port, char *err, size_t errsize);
+
+/* Look a host up the way the system does (getaddrinfo: the hosts file and
+ * DNS, in the order /etc/nsswitch.conf gives). An IP address is accepted as
+ * it is. Returns 0 and the addresses found ("192.168.1.20, 2001:db8::5") in
+ * `found`, or -1 with a message telling the player what to do. */
+int net_resolve(const char *host, char *found, size_t fsize, char *err, size_t errsize);
+
+/* This machine's addresses that other machines can reach: IPv4 first, then
+ * global IPv6; loopback and link-local addresses left out. Returns how many
+ * (written to out as "192.168.1.20, 2001:db8::5"). */
+int net_local_addresses(char *out, size_t size);
+
 /* ---- joining ---- */
 
-/* Connect through ssh to `host` ([user@]host, ssh's own syntax) and ask for a
- * seat as `name`. `remote_cmd` is the program to run there (normally
+/* Connect through ssh to `host` - what the player typed, without the :port
+ * (see net_parse_address) - and ask for a seat as `name`. The host name is
+ * looked up first (net_resolve), so a name that is in neither DNS nor the
+ * hosts file gets a clear message before ssh is started; ssh is then given
+ * the name as typed, so its known_hosts entry for that name still applies. `remote_cmd` is the program to run there (normally
  * "viola-landlord"). The environment variable VIOLA_LANDLORD_SSH replaces
  * "ssh" (the tests use it). Returns 0 once WELCOMEd, or -1 with the reason
  * (ssh's own error, or the host's REFUSE) in err. */

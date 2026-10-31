@@ -6,8 +6,12 @@
 viola-landlord \- The Landlord's Game (Lizzie J. Magie, 1904) against the computer, for X11
 .SH SYNOPSIS
 .B viola-landlord
-.RB [ \-\-version ]
-.RB [ \-\-help ]
+.RB [ \-\-host " | " \-\-join
+.IR host " | "
+.BR \-\-local ]
+.br
+.B viola-landlord
+.RB [ \-\-version " | " \-\-help ]
 .br
 .B viola\-landlord \-\-relay
 .I port
@@ -33,6 +37,27 @@ gray94 panels, raised bevels, black focus boxes, Helvetica menus.
 The game ends when a player has drawn his wages five times (three, seven or
 ten can be chosen); the richest player wins, counting cash and 100 for each
 card, house and luxury.
+.SH OPTIONS
+At start-up the game asks whether to host a network game, join one, or play
+at this screen. These options skip the question:
+.TP
+.B \-\-host
+host a network game.
+.TP
+.BI \-\-join " host"
+join the game hosted on
+.IR host :
+an IP address (IPv4 or IPv6) or a host name found in DNS or
+.IR /etc/hosts ,
+optionally with
+.IB user @
+in front and
+.BI : port
+after it (an IPv6 address with a port in brackets,
+.BR [2001:db8::5]:1905 ).
+.TP
+.B \-\-local
+play at this screen, against the computer or hot-seat.
 .SH PLAYING
 On your turn press
 .B Roll Dice
@@ -48,10 +73,12 @@ One player chooses
 .BR "Game > Host a Network Game" ;
 up to three others choose
 .B "Game > Join a Network Game"
-and give the host's machine as
-.B ssh
-would,
+and give the host's IP address or host name,
 .RI [ user\fB@\fP] host [\fB:\fP port ].
+A name is looked up in DNS and
+.I /etc/hosts
+(the system resolver); one found in neither is reported before ssh is
+started. The host's waiting room shows its name and IP addresses.
 The joiner's game runs
 .PP
 .RS
