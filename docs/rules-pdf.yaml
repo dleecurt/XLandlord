@@ -1,0 +1,22 @@
+# docs/rules-pdf.yaml - pandoc settings for the PDF of RULES.md (make pdf).
+# The first heading of RULES.md becomes the title (--shift-heading-level-by=-1).
+from: markdown
+to: pdf
+pdf-engine: pdflatex   # (make pdf passes the one configure found)
+shift-heading-level-by: -1
+table-of-contents: true
+toc-depth: 1
+number-sections: false
+metadata:
+  subtitle: "Lizzie J. Magie's game of 1904, by the rules of 1906, for X11"
+  author: "Viola the Landlord 0.0.4"
+  date: "2026"
+variables:
+  documentclass: article
+  papersize: letter
+  fontsize: 11pt
+  geometry: "margin=0.9in"
+  colorlinks: true
+  linkcolor: black
+  urlcolor: black
+  toccolor: black

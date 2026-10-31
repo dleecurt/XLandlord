@@ -59,6 +59,7 @@ int game_random(Game *g, int n)
     return (int)(((x * 0x2545F4914F6CDD1DULL) >> 33) % (unsigned long long)n);
 }
 
+/* Fisher-Yates shuffle of n ints with the game's own random numbers. */
 static void shuffle(Game *g, int *a, int n)
 {
     for (int i = n - 1; i > 0; i--) {
@@ -79,14 +80,18 @@ void game_log(Game *g, const char *fmt, ...)
     if (g->hooks.changed) g->hooks.changed(g);
 }
 
+/* See game.h: the i-th newest line of the ring of messages. */
 const char *game_log_line(const Game *g, int i)
 {
     if (i < 0 || i >= g->log_count || i >= LOG_LINES) return NULL;
     return g->log[(g->log_count - 1 - i) % LOG_LINES];
 }
 
+/* Player p's name, for messages. */
 static const char *nm(const Game *g, int p) { return g->pl[p].name; }
 
+/* Let the window show what happened (the hook may wait for the human to
+ * watch). */
 static void pause_here(Game *g, int p)
 {
     if (g->hooks.pause) g->hooks.pause(g, p);
@@ -129,8 +134,11 @@ int game_section(int sp)
     return (sp / SIDE) * 2 + (off > SIDE / 2);
 }
 
+/* Houses a lot may hold: three under the advanced rules, nine otherwise. */
 static int house_limit(const Game *g) { return g->advanced ? 3 : 9; }
 
+/* See game.h. Under the advanced rules the rent doubles for each round of
+ * houses on every lot of the section. */
 int game_land_rent(const Game *g, int sp)
 {
     int rent = board[sp].rent;
@@ -143,6 +151,8 @@ int game_land_rent(const Game *g, int sp)
     return rent << MIN(least, 3);
 }
 
+/* The railroads player p owns (not counting those taken over by the
+ * public). */
 static int rails_owned(const Game *g, int p)
 {
     int n = 0;
@@ -153,6 +163,8 @@ static int rails_owned(const Game *g, int p)
 
 static int in_trust(const Game *g, int p) { return p >= 0 && (p == g->trust_a || p == g->trust_b); }
 
+/* See game.h: $5 for one railroad, $10 / $20 / $50 with two, three, four
+ * (MONOPOLY), $40 in a TRUST, nothing when publicly owned. */
 int game_rail_fare(const Game *g, int sp)
 {
     int o = g->owner[sp];
@@ -163,6 +175,7 @@ int game_rail_fare(const Game *g, int sp)
     return fare[MIN(rails_owned(g, o), 4)];
 }
 
+/* A franchise: $5, or $25 when one owner holds both (the MUNICIPAL CINCH). */
 static int franchise_fare(const Game *g, int sp)
 {
     int o = g->owner[sp];
@@ -172,6 +185,7 @@ static int franchise_fare(const Game *g, int sp)
     return both ? 25 : 5;                               /* MUNICIPAL CINCH */
 }
 
+/* Houses on the whole board (the advanced rules raise taxes at 10 and 25). */
 int game_houses_total(const Game *g)
 {
     int n = 0;
@@ -179,6 +193,8 @@ int game_houses_total(const Game *g)
     return n;
 }
 
+/* See game.h: $10, $20 at 10 houses and $40 at 25 under the advanced rules,
+ * nothing under the Single Tax. */
 int game_tax(const Game *g)
 {
     if (g->single_tax) return 0;
@@ -190,6 +206,7 @@ int game_tax(const Game *g)
     return 10;
 }
 
+/* See game.h: cards player p holds, of one kind or all. */
 int game_cards_of(const Game *g, int p, int type)
 {
     int n = 0;
@@ -198,6 +215,7 @@ int game_cards_of(const Game *g, int p, int type)
     return n;
 }
 
+/* See game.h: houses player p has built. */
 int game_houses_of(const Game *g, int p)
 {
     int n = 0;
@@ -206,6 +224,8 @@ int game_houses_of(const Game *g, int p)
     return n;
 }
 
+/* See game.h: cash plus 100 for each card, house, luxury and Professor card
+ * (no lot deeds under the Single Tax). */
 int game_worth(const Game *g, int p)
 {
     const Player *P = &g->pl[p];
@@ -218,6 +238,7 @@ int game_worth(const Game *g, int p)
     return w;
 }
 
+/* See game.h: the player of greatest worth (the first such on a tie). */
 int game_leader(const Game *g)
 {
     int best = 0;
@@ -226,6 +247,8 @@ int game_leader(const Game *g)
     return best;
 }
 
+/* See game.h: an estimate for the computer players of what a stop on sp
+ * costs p (negative = a gain). */
 int game_landing_cost(const Game *g, int p, int sp)
 {
     const Space *s = &board[sp];
@@ -270,6 +293,7 @@ static void transfer(Game *g, int from, int to, int amount)
 
 static void collect(Game *g, int p, int amount) { g->pl[p].cash += amount; }
 
+/* Has p anything left to sell to raise money? */
 static int has_assets(const Game *g, int p)
 {
     for (int i = 0; i < NSPACES; i++) {
@@ -363,6 +387,7 @@ static void st_spend(Game *g)
     }
 }
 
+/* See game.h: p proposes, the others vote; two votes in all carry it. */
 int game_propose_single_tax(Game *g, int p)
 {
     if (g->single_tax || g->over) return 0;
@@ -424,6 +449,8 @@ static void take_card(Game *g, int p, int sp, int price)
     if (board[sp].type == T_RAILROAD) check_trust(g);
 }
 
+/* Rule 1: deal the cards round, at most 24, and let each player buy those
+ * dealt to him. */
 void game_deal(Game *g)
 {
     int cards[NSPACES], n = 0;
@@ -480,6 +507,8 @@ static int offer(Game *g, int p, int sp)
     return NOBODY;
 }
 
+/* See game.h: sell card sp between two players; refused for lots with
+ * houses (sell those first) and for lot deeds under the Single Tax. */
 const char *game_trade(Game *g, int seller, int buyer, int sp, int price)
 {
     if (!board_has_card(sp) || g->owner[sp] != seller) return "That card is not his to sell.";
@@ -494,6 +523,7 @@ const char *game_trade(Game *g, int seller, int buyer, int sp, int price)
     return NULL;
 }
 
+/* See game.h: back to the pack for half the sale price. */
 const char *game_sell_to_pack(Game *g, int p, int sp)
 {
     if (!board_has_card(sp) || g->owner[sp] != p) return "That card is not yours.";
@@ -506,6 +536,7 @@ const char *game_sell_to_pack(Game *g, int p, int sp)
     return NULL;
 }
 
+/* See game.h: a house back to the bank for $50. */
 const char *game_sell_house(Game *g, int p, int sp)
 {
     if (g->houses[sp] <= 0 || g->house_owner[sp] != p) return "You have no house there.";
@@ -516,6 +547,8 @@ const char *game_sell_house(Game *g, int p, int sp)
     return NULL;
 }
 
+/* See game.h: own lots only, or under the Single Tax any unimproved lot (or
+ * one with your own houses); never past the house limit. */
 int game_can_build(const Game *g, int p, int sp)
 {
     if (sp < 0 || sp >= NSPACES || board[sp].type != T_LOT || g->over) return 0;
@@ -524,6 +557,7 @@ int game_can_build(const Game *g, int p, int sp)
     return g->owner[sp] == p;
 }
 
+/* See game.h: build one house for $100. */
 const char *game_build(Game *g, int p, int sp)
 {
     if (!game_can_build(g, p, sp)) {
@@ -560,6 +594,7 @@ static void step_forward(Game *g, int p, int n)
     }
 }
 
+/* Put p in Jail (Rules 5 and 6) and end his turn. */
 static void go_to_jail(Game *g, int p)
 {
     Player *P = &g->pl[p];
@@ -570,6 +605,7 @@ static void go_to_jail(Game *g, int p)
     game_log(g, "%s goes to Jail.", nm(g, p));
 }
 
+/* Throw two dice and show them. */
 static void roll(Game *g, int *d1, int *d2)
 {
     *d1 = 1 + game_random(g, 6);
@@ -585,6 +621,9 @@ static int to_corner(int from) { return SIDE - from % SIDE; }
 /* Where a throw of n with the official pass would end. */
 static int pass_dest(int from, int n) { return (from + n + SIDE - 1) % NSPACES; }
 
+/* Move p by a throw of d1 and d2: the backward choice between the Chances,
+ * the railroad pass on a double, the refusal to speculate; then settle the
+ * space. */
 static void move(Game *g, int p, int d1, int d2)
 {
     Player *P = &g->pl[p];
@@ -721,6 +760,8 @@ static void speculation(Game *g, int p)
              cut ? ", paying 10% to the broker" : "");
 }
 
+/* Rule 11: draw a red card and do what it says (moves settle their new
+ * space). */
 static void draw_chance(Game *g, int p, int depth)
 {
     Player *P = &g->pl[p];

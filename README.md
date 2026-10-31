@@ -36,6 +36,15 @@ make clean
 From a source checkout (no `configure` yet), run `./autogen.sh` first; it
 needs GNU autoconf, automake and pkg-config.
 
+**[INSTALL.md](INSTALL.md)** is the full guide to building and installing:
+packages for each system, configure options, every make target, what is
+installed where, uninstalling, network-play requirements and troubleshooting.
+
+**[docs/RULES.md](docs/RULES.md)** is the complete rule book and how-to-play
+guide, with screenshots, a numbered board map and a quick-reference page; the
+same document is in **[docs/viola-landlord-rules.pdf](docs/viola-landlord-rules.pdf)**
+for printing. Both are installed in `$(prefix)/share/doc/viola-landlord`.
+
 | System        | Build                           | Fonts (to look like Viola)                  |
 | ------------- | ------------------------------- | ------------------------------------------- |
 | Debian/Ubuntu | `sudo apt install libx11-dev`   | `sudo apt install xfonts-base xfonts-75dpi` |
@@ -44,7 +53,7 @@ needs GNU autoconf, automake and pkg-config.
 
 Without the 75dpi fonts the game still runs; X picks the nearest fonts it has.
 
-Current version: **0.0.3** (see `CHANGELOG.md`).
+Current version: **0.0.4** (see `CHANGELOG.md`).
 
 ## Playing
 
@@ -288,6 +297,8 @@ Only public-domain material or art made for this program is used:
 | `src/prefs.c` | the preferences file |
 | `src/main.c` | start-up, the main loop, the commands |
 | `tests/engine.c` | `make check`: computer-only games and consistency checks |
+| `docs/RULES.md` | the rule book and how-to-play guide (source of the PDF) |
+| `docs/boardmap.c` | writes the numbered board map for the rules from `src/board.c` |
 | `tests/net.c` | `make check`: network games end to end through a stand-in for ssh (table limit, no CPU with four humans, dropped players) |
 
 ## License

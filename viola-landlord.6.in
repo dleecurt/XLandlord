@@ -134,6 +134,15 @@ rules are those of the patent and of 1906. Both are in the public domain.
 All pictures are original to this program. The exact order of some spaces,
 the land rent of each lot and the Chance cards are not given by the
 surviving 1906 rule text and are reconstructed; see README.md.
+.SH SEE ALSO
+The rule book and how-to-play guide,
+.I RULES.md
+and
+.IR viola\-landlord\-rules.pdf ,
+and the build guide
+.IR INSTALL.md ,
+in the documentation directory (normally
+.IR /usr/local/share/doc/viola\-landlord ).
 .SH AUTHOR
 Lee Curtis.
 .SH COPYRIGHT

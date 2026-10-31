@@ -37,6 +37,8 @@ static int failures;
 
 #define CHECK(cond, ...) do { if (!(cond)) { failures++; printf("FAIL: " __VA_ARGS__); printf("\n"); } } while (0)
 
+/* Check that the game's state makes sense: no negative cash, owners and
+ * houses where they may be. */
 static void consistent(const Game *g)
 {
     for (int p = 0; p < g->nplayers; p++) {
@@ -98,6 +100,8 @@ static int play(int np, const int *diffs, unsigned long seed, int advanced, int 
     return game_leader(&g);
 }
 
+/* Play `games` two-player games between levels a and b (alternating who
+ * starts) and check that a wins more. */
 static void match(const char *title, int a, int b, int games, int advanced)
 {
     int wins[2] = { 0, 0 }, total_turns = 0;
@@ -114,6 +118,7 @@ static void match(const char *title, int a, int b, int games, int advanced)
     CHECK(wins[0] > wins[1], "%s: the stronger player won only %d of %d", title, wins[0], games);
 }
 
+/* Run every check; -v prints the scores. */
 int main(int argc, char **argv)
 {
     verbose = argc > 1 && strcmp(argv[1], "-v") == 0;

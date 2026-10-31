@@ -67,6 +67,7 @@ const Space board[NSPACES] = {
     /* 39 */ { "Chance",                    "CHANCE",                 T_CHANCE,      0,  0 },
 };
 
+/* See board.h: lots, railroads, franchises and Speculation have cards. */
 int board_has_card(int sp)
 {
     if (sp < 0 || sp >= NSPACES) return 0;

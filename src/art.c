@@ -387,10 +387,12 @@ static const char *const *const pictures[ART_COUNT] = {
     diamond, bread, flame, roof, shirt, sign, dice, scroll, college, house,
 };
 
+/* See art.h. */
 const char *const *art_rows(ArtId id) { return pictures[id]; }
 
 int art_width(ArtId id) { return (int)strlen(pictures[id][0]); }
 
+/* The number of rows in a picture. */
 int art_height(ArtId id)
 {
     int n = 0;
@@ -419,6 +421,7 @@ static const char *const icon[] = {
     "................",
 };
 
+/* See art.h: one pixel of the 32 x 32 icon (the 16 x 16 picture doubled). */
 unsigned long art_icon_argb(int x, int y)
 {
     if (x < 0 || y < 0 || x >= 32 || y >= 32) return 0;

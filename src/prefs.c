@@ -29,6 +29,7 @@
 #include "game.h"
 #include "util.h"
 
+/* See prefs.h. */
 int prefs_seat_difficulty(int kind)
 {
     switch (kind) {
@@ -39,6 +40,7 @@ int prefs_seat_difficulty(int kind)
     }
 }
 
+/* See prefs.h. */
 int prefs_seats_used(const Prefs *p)
 {
     int n = 0;
@@ -46,6 +48,7 @@ int prefs_seats_used(const Prefs *p)
     return n;
 }
 
+/* See prefs.h. */
 int prefs_humans(const Prefs *p)
 {
     int n = 0;
@@ -53,6 +56,8 @@ int prefs_humans(const Prefs *p)
     return n;
 }
 
+/* See prefs.h: one human (named after $USER) against one medium computer
+ * player, five wages, standard rules. */
 void prefs_defaults(Prefs *p)
 {
     memset(p, 0, sizeof *p);
@@ -77,6 +82,7 @@ void prefs_defaults(Prefs *p)
 
 static const char *const seat_word[SEAT_KINDS] = { "empty", "human", "easy", "medium", "hard", "network" };
 
+/* A seat kind from its word in the file ("human", "hard"...), or -1. */
 static int seat_from_word(const char *w)
 {
     for (int i = 0; i < SEAT_KINDS; i++) if (!strcmp(w, seat_word[i])) return i;
@@ -99,6 +105,8 @@ static int config_dir(char *out, size_t size, int make)
     return 1;
 }
 
+/* See prefs.h. Unknown keys are ignored; 0.0.1 files (name, difficulty,
+ * opponents) are converted. */
 void prefs_load(Prefs *p)
 {
     char dir[600], path[700], line[256];
@@ -154,6 +162,7 @@ void prefs_load(Prefs *p)
     }
 }
 
+/* See prefs.h: the whole file, rewritten. */
 int prefs_save(const Prefs *p)
 {
     char dir[600], path[700];
@@ -181,6 +190,7 @@ int prefs_save(const Prefs *p)
     return fclose(f) == 0;
 }
 
+/* See prefs.h. */
 int prefs_delay(const Prefs *p)
 {
     static const int ms[] = { 150, 650, 1400 };

@@ -53,9 +53,11 @@ static const int kind_fields[NM_COUNT] = {
     [NM_NOTE] = 0, [NM_BYE] = 0,
 };
 
+/* See net.h: the first word of a message line, and its count of numbers. */
 const char *net_kind_name(NetMsgKind k) { return k >= 0 && k < NM_COUNT ? kind_names[k] : "?"; }
 int net_fields_of(NetMsgKind k) { return k >= 0 && k < NM_COUNT ? kind_fields[k] : 0; }
 
+/* See net.h: one message line, without its newline. */
 int net_format(char *out, size_t size, NetMsgKind kind, const int *num, int nnum, const char *text)
 {
     if (kind < 0 || kind >= NM_COUNT || !size) return -1;
@@ -76,6 +78,7 @@ int net_format(char *out, size_t size, NetMsgKind kind, const int *num, int nnum
     return (int)at;
 }
 
+/* See net.h: a line into a NetMsg (the kind's numbers, then the text). */
 int net_parse(const char *line, NetMsg *m)
 {
     memset(m, 0, sizeof *m);
@@ -113,6 +116,8 @@ int net_parse(const char *line, NetMsg *m)
 #define STATE_PLAYER 12
 #define STATE_SPACE  5
 
+/* See net.h: the Game as numbers - a header, then each player, then each
+ * space. */
 int net_encode_state(const Game *g, int *num, int max)
 {
     int need = STATE_HEAD + g->nplayers * STATE_PLAYER + NSPACES * STATE_SPACE, k = 0;
@@ -138,6 +143,7 @@ int net_encode_state(const Game *g, int *num, int max)
     return k;
 }
 
+/* See net.h: the reverse of net_encode_state, with every value checked. */
 int net_decode_state(Game *g, const int *num, int n)
 {
     if (n < STATE_HEAD) return -1;
@@ -174,6 +180,7 @@ int net_decode_state(Game *g, const int *num, int n)
 
 int net_sale_encode(int kind, int sp, int buyer) { return (kind & 3) | (sp << 2) | ((buyer + 1) << 8); }
 
+/* See net.h: the reverse of net_sale_encode. */
 void net_sale_decode(int v, int *kind, int *sp, int *buyer)
 {
     *kind = v & 3;
@@ -221,6 +228,7 @@ static int write_line(int fd, const char *line)
     return 0;
 }
 
+/* Format a message and write it as a line. */
 static int send_msg(int fd, NetMsgKind kind, const int *num, int nnum, const char *text)
 {
     char line[NET_LINE_MAX];
@@ -256,6 +264,7 @@ static int take_line(LineBuf *b, char *out, size_t size)
     return 1;
 }
 
+/* Milliseconds on the wall clock. */
 static long now_ms(void)
 {
     struct timeval tv;
@@ -275,8 +284,8 @@ static int wait_readable(int fd, int ms)
 
 /* ==== common ==== */
 
-static NetRole role = NET_NONE;
-static int (*idle_fn)(void);
+static NetRole role = NET_NONE;         /* hosting, joined, or neither */
+static int (*idle_fn)(void);            /* keeps the window alive during waits (netui_idle) */
 
 /* The joiner's side: the pipe to ssh, ssh itself, and where ssh's errors go. */
 static LineBuf cin = { -1, "", 0 };
@@ -284,6 +293,8 @@ static pid_t ssh_pid = -1;
 static FILE *ssh_err;
 void net_client_close(const char *why);
 
+/* See net.h: whether this program hosts, has joined, or neither; and the
+ * function that keeps the window alive during network waits. */
 NetRole net_role(void) { return role; }
 void net_set_idle(int (*idle)(void)) { idle_fn = idle; }
 
@@ -301,31 +312,35 @@ typedef struct {
     char name[NAME_LEN];
 } Conn;
 
-static int listen_fd = -1;
-static Conn conns[MAX_CONNS];
+static int listen_fd = -1;              /* the localhost listener */
+static Conn conns[MAX_CONNS];           /* everyone connected: in the lobby, seated, or just arrived */
 static int lobby[NET_MAX_REMOTE], nlobby;       /* conn indices, in order of arrival */
 static int lobby_open;                          /* before the game starts */
 static int seat_conn[MAXPLAYERS];               /* conn of a remote seat, or -1 */
-static int seat_remote[MAXPLAYERS];
-static Game *hgame;
-static int sent_log;
-static int ask_id;
+static int seat_remote[MAXPLAYERS];     /* the seat belongs to a joiner (even after he left) */
+static Game *hgame;                     /* the hosted game, once started */
+static int sent_log;                    /* log lines already sent to the joiners */
+static int ask_id;                      /* number of the last ASK, to match its ANSWER */
 static int waiting_conn = -1;
 static int last_num[NET_MAX_FIELDS], last_n = -1;    /* the STATE last sent */                   /* the conn a wait reads itself */
-static int in_broadcast;
-static char host_name[NAME_LEN];
-static int (*action_fn)(Game *, int, const NetMsg *);
+static int in_broadcast;                /* (a broadcast must not start another) */
+static char host_name[NAME_LEN];        /* shown to joiners in the lobby */
+static int (*action_fn)(Game *, int, const NetMsg *);   /* main.c's host_action */
 static char events[8][200];
 static int nevents, events_read;
 
+/* See net.h: what the host does with a joiner's ACTION. */
 void net_set_action_handler(int (*fn)(Game *g, int p, const NetMsg *m)) { action_fn = fn; }
 
+/* Remember something for the host's waiting room (a join, a refusal, a
+ * departure). */
 static void event(const char *fmt, const char *a, const char *b)
 {
     snprintf(events[nevents % 8], sizeof events[0], fmt, a, b);
     nevents++;
 }
 
+/* See net.h: the oldest lobby event not yet shown. */
 const char *net_host_event(void)
 {
     if (events_read >= nevents) return NULL;
@@ -338,6 +353,8 @@ const char *net_lobby_name(int i) { return i >= 0 && i < nlobby ? conns[lobby[i]
 int net_seat_remote(int p) { return role == NET_HOST && p >= 0 && p < MAXPLAYERS && seat_remote[p]; }
 int net_seat_connected(int p) { return net_seat_remote(p) && seat_conn[p] >= 0 && conns[seat_conn[p]].open; }
 
+/* See net.h: listen on 127.0.0.1 only; joiners arrive through ssh and the
+ * relay. */
 int net_host(int port, char *err, size_t errsize)
 {
     net_close(NULL);
@@ -368,6 +385,7 @@ int net_host(int port, char *err, size_t errsize)
     return 0;
 }
 
+/* Close a connection without any farewell. */
 static void close_conn(int c)
 {
     if (!conns[c].open) return;
@@ -375,6 +393,7 @@ static void close_conn(int c)
     conns[c].open = 0;
 }
 
+/* Tell everyone waiting who is at the table. */
 static void send_lobby(void)
 {
     char text[400];
@@ -410,12 +429,15 @@ static void drop(int c)
     }
 }
 
+/* Turn a newcomer away with a REFUSE carrying the reason. */
 static void refuse(int c, const char *why)
 {
     send_msg(conns[c].in.fd, NM_REFUSE, NULL, 0, why);
     close_conn(c);
 }
 
+/* Humans at the table now: the host and the joiners (or, during a game, the
+ * human seats). */
 static int humans_seated(void)
 {
     if (!hgame) return 1 + nlobby;
@@ -479,6 +501,7 @@ static void service(int c)
     }
 }
 
+/* See net.h: accept newcomers, read the waiting joiners, notice departures. */
 int net_host_poll(int ms)
 {
     if (role != NET_HOST) return 0;
@@ -519,6 +542,8 @@ int net_host_poll(int ms)
 
 static const char *const cpu_name = "Lord Blueblood";
 
+/* See net.h: host, joiners in order of arrival, then one computer player
+ * only if a seat is free. */
 void net_build_table(GameSettings *s, const char *hname, int cpu_difficulty)
 {
     copy_str(host_name, sizeof host_name, hname);
@@ -547,6 +572,7 @@ void net_build_table(GameSettings *s, const char *hname, int cpu_difficulty)
 
 void net_set_host_name(const char *name) { copy_str(host_name, sizeof host_name, name); }
 
+/* See net.h: START and PLAYER to every joiner, then the first STATE. */
 void net_start_game(Game *g)
 {
     hgame = g;
@@ -573,6 +599,7 @@ static void send_to(int p, NetMsgKind kind, const int *num, int nnum, const char
     if (send_msg(conns[c].in.fd, kind, num, nnum, text) < 0) drop(c);
 }
 
+/* See net.h: new LOG lines and the STATE, only when something changed. */
 void net_broadcast(Game *g)
 {
     if (role != NET_HOST || !hgame || g != hgame || in_broadcast) return;
@@ -593,6 +620,7 @@ void net_broadcast(Game *g)
     in_broadcast = 0;
 }
 
+/* See net.h: a NOTE carrying "title|text". */
 void net_note(int p, const char *title, const char *text)
 {
     char buf[NET_LINE_MAX];
@@ -600,6 +628,7 @@ void net_note(int p, const char *title, const char *text)
     send_to(p, NM_NOTE, NULL, 0, buf);
 }
 
+/* See net.h: TURN to every joiner. */
 void net_turn(int p)
 {
     if (!hgame) return;
@@ -634,6 +663,8 @@ static int seat_line(int p, char *line, size_t size)
     }
 }
 
+/* See net.h: send ASK and wait for the matching ANSWER, keeping the host's
+ * window and the other connections alive. */
 int net_ask(int p, NetAsk kind, int a, int b, int c, const char *text)
 {
     if (role != NET_HOST || !net_seat_connected(p)) return -1;
@@ -651,6 +682,8 @@ int net_ask(int p, NetAsk kind, int a, int b, int c, const char *text)
     return -1;
 }
 
+/* See net.h: BYE to everyone, close; hosted seats of joiners go to computer
+ * players. */
 void net_close(const char *why)
 {
     if (role == NET_HOST) {
@@ -673,6 +706,7 @@ void net_close(const char *why)
     role = NET_NONE;
 }
 
+/* See net.h: in a child of fork(), drop the parent's connections silently. */
 void net_after_fork(void)
 {
     for (int c = 0; c < MAX_CONNS; c++) if (conns[c].open) { close(conns[c].in.fd); conns[c].open = 0; }
@@ -701,33 +735,43 @@ static void nd_deal_buy(Game *g, int p, const int *cards, int n, int *want)
 #define ASK_OR_AI(kind, a, b, c, ai_call) \
     do { int r_ = net_ask(p, kind, a, b, c, NULL); return r_ >= 0 ? r_ : (ai_call); } while (0)
 
+/* Rule 7 for a joiner (the computer answers if he is gone). */
 static int nd_buy(Game *g, int p, int sp, int price, int hb)
 { ASK_OR_AI(NA_BUY, sp, price, hb, ai_decider.buy(g, p, sp, price, hb)); }
 
+/* Rule 7's bid for a joiner. */
 static int nd_max_bid(Game *g, int p, int sp, int min)
 { ASK_OR_AI(NA_MAX_BID, sp, min, 0, ai_decider.max_bid(g, p, sp, min)); }
 
+/* Rule 6 for a joiner. */
 static int nd_jail_pay(Game *g, int p)
 { ASK_OR_AI(NA_JAIL_PAY, 0, 0, 0, ai_decider.jail_pay(g, p)); }
 
+/* Rule 17 for a joiner. */
 static int nd_use_pass(Game *g, int p, int with, int without)
 { ASK_OR_AI(NA_USE_PASS, with, without, 0, ai_decider.use_pass(g, p, with, without)); }
 
+/* Rule 2 for a joiner. */
 static int nd_direction(Game *g, int p, int fwd, int back)
 { ASK_OR_AI(NA_DIRECTION, fwd, back, 0, ai_decider.direction(g, p, fwd, back)); }
 
+/* Rule 8 for a joiner. */
 static int nd_speculate(Game *g, int p)
 { ASK_OR_AI(NA_SPECULATE, 0, 0, 0, ai_decider.speculate(g, p)); }
 
+/* Rule 13 for a joiner. */
 static int nd_luxury(Game *g, int p)
 { ASK_OR_AI(NA_LUXURY, 0, 0, 0, ai_decider.luxury(g, p)); }
 
+/* Single Tax Rule 4 for a joiner. */
 static int nd_st_build(Game *g, int p, int sp)
 { ASK_OR_AI(NA_ST_BUILD, sp, 0, 0, ai_decider.st_build(g, p, sp)); }
 
+/* The Single Tax vote for a joiner. */
 static int nd_vote(Game *g, int p, int proposer)
 { ASK_OR_AI(NA_VOTE, proposer, 0, 0, ai_decider.vote_single_tax(g, p, proposer)); }
 
+/* Rule 9's Trust for a joiner. */
 static int nd_trust(Game *g, int p, int other)
 { ASK_OR_AI(NA_TRUST, other, 0, 0, ai_decider.join_trust(g, p, other)); }
 
@@ -805,6 +849,7 @@ static void ssh_errors(char *out, size_t size)
     for (char *p = out; *p; p++) if (*p == '\n' || *p == '\r') *p = ' ';
 }
 
+/* The joiner's side of net_close: BYE, close the pipe, let ssh finish. */
 void net_client_close(const char *why)
 {
     if (cin.fd >= 0) {
@@ -823,6 +868,8 @@ void net_client_close(const char *why)
     ssh_err = NULL;
 }
 
+/* See net.h: start ssh with the relay command, send HELLO, wait for WELCOME
+ * or REFUSE. */
 int net_join(const char *host, int port, const char *remote_cmd, const char *name, char *err, size_t errsize)
 {
     net_close(NULL);
@@ -887,6 +934,7 @@ int net_join(const char *host, int port, const char *remote_cmd, const char *nam
     return -1;
 }
 
+/* See net.h: the next complete message from the host. */
 int net_client_recv(NetMsg *m, int ms)
 {
     if (role != NET_CLIENT || cin.fd < 0) return -1;
@@ -908,6 +956,7 @@ int net_client_recv(NetMsg *m, int ms)
     }
 }
 
+/* See net.h: one message to the host. */
 int net_client_send(NetMsgKind kind, const int *num, int nnum, const char *text)
 {
     if (role != NET_CLIENT || cin.fd < 0) return -1;

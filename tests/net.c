@@ -144,6 +144,7 @@ static void robot(const char *name, int leave_after)
     }
 }
 
+/* Fork a robot joiner. */
 static pid_t spawn_robot(const char *name, int leave_after)
 {
     fflush(stdout);
@@ -200,6 +201,7 @@ static int play_hosted(Game *g, int *nplayers, int *over)
     return ncpu;
 }
 
+/* The tests in order; also the stand-in for ssh (see the top of the file). */
 int main(int argc, char **argv)
 {
     /* Started as "ssh -T -o ... host COMMAND --relay PORT": be sshd + relay. */

@@ -37,9 +37,12 @@
 
 #define LAND_RATE (1.0 / 7.0)
 
+/* The level (DIFF_*) of computer player p. */
 static int diff(const Game *g, int p) { return g->pl[p].difficulty; }
 static int chance_pct(Game *g, int pct) { return game_random(g, 100) < pct; }
 
+/* Trips round the board left before someone draws his last wages (at least
+ * 0.75, so a card is never worth nothing). */
 static double circuits_left(const Game *g)
 {
     int most = 0;
@@ -47,6 +50,7 @@ static double circuits_left(const Game *g)
     return MAX(0.75, (double)(g->end_wages - most));
 }
 
+/* The railroads player p owns that the public has not taken over. */
 static int rails_of(const Game *g, int p)
 {
     int n = 0;
@@ -62,6 +66,8 @@ static int rail_income(int count)       /* fares from `count` railroads, one sto
     return count * fare[count];
 }
 
+/* How many cards are still in the pack (lots, charters, the broker's
+ * license). */
 static int unowned_cards(const Game *g)
 {
     int n = 0;
@@ -114,6 +120,9 @@ static double blocking_value(const Game *g, int p, int sp)
     return best;
 }
 
+/* See ai.h. Easy guesses, Medium counts most of the end value and some
+ * rent, Hard counts the end value, the expected rent for the circuits left,
+ * and what keeping the card from a rival is worth. */
 int ai_card_value(Game *g, int p, int sp)
 {
     if (!board_has_card(sp)) return 0;
@@ -131,6 +140,8 @@ int ai_card_value(Game *g, int p, int sp)
     }
 }
 
+/* See ai.h. Easy and Medium keep a fixed sum; Hard keeps what a trip round
+ * the board is expected to cost, or at least the dearest single stop. */
 int ai_buffer(Game *g, int p)
 {
     switch (diff(g, p)) {
@@ -190,6 +201,8 @@ static int ai_buy(Game *g, int p, int sp, int price, int high_bidder)
     }
 }
 
+/* Rule 7: the most p bids for unowned sp (0 = none). Hard bids up to the
+ * card's worth to it, keeping its cash buffer. */
 static int ai_max_bid(Game *g, int p, int sp, int min)
 {
     int cash = g->pl[p].cash, v = ai_card_value(g, p, sp);
@@ -200,6 +213,7 @@ static int ai_max_bid(Game *g, int p, int sp, int min)
     }
 }
 
+/* See ai.h: what p would pay another player for card sp. */
 int ai_offer_for(Game *g, int p, int sp)
 {
     int v = ai_card_value(g, p, sp), cash = g->pl[p].cash - ai_buffer(g, p);
@@ -210,6 +224,8 @@ int ai_offer_for(Game *g, int p, int sp)
     }
 }
 
+/* See ai.h: p sells only for more than the card is worth to it (Easy: a
+ * little over the sale price). */
 int ai_accepts_sale(Game *g, int p, int sp, int price)
 {
     /* What the card is worth to p if it keeps it. */
@@ -246,6 +262,8 @@ static double pace(Game *g, int p)
     return v;
 }
 
+/* Rule 17: use the railroad pass? Hard weighs both landing squares and the
+ * nine spaces of progress. */
 static int ai_use_pass(Game *g, int p, int with, int without)
 {
     switch (diff(g, p)) {
@@ -257,6 +275,8 @@ static int ai_use_pass(Game *g, int p, int with, int without)
     }
 }
 
+/* Rule 2: forward (1) or backward (0) between the Chances, by the cost of
+ * each landing square. */
 static int ai_direction(Game *g, int p, int fwd, int back)
 {
     switch (diff(g, p)) {
@@ -269,6 +289,8 @@ static int ai_direction(Game *g, int p, int fwd, int back)
     }
 }
 
+/* Rule 8: move onto Speculation? Its average payout beats the ante, so the
+ * sensible players always play when they can. */
 static int ai_speculate(Game *g, int p)
 {
     /* On average the broker's game pays the speculator about $40 for a $10
@@ -277,6 +299,7 @@ static int ai_speculate(Game *g, int p)
     return g->pl[p].cash >= 10;
 }
 
+/* Rule 13: buy the luxury ($75 for a card worth 100) or move backward? */
 static int ai_luxury(Game *g, int p)
 {
     int cash = g->pl[p].cash;
@@ -296,6 +319,7 @@ static double jail_exit_cost(Game *g, int p)
     return sum / 36.0;
 }
 
+/* Rule 6: pay the $50 fine (1) or try for a double (0)? */
 static int ai_jail_pay(Game *g, int p)
 {
     int cash = g->pl[p].cash;
@@ -311,6 +335,7 @@ static int ai_jail_pay(Game *g, int p)
     }
 }
 
+/* Single Tax Rule 4: build a house on the unimproved lot just landed on? */
 static int ai_st_build(Game *g, int p, int sp)
 {
     (void)sp;
@@ -376,6 +401,8 @@ static void standing(const Game *g, int p, int *now, int *st)
     *st = best_st - me_st;
 }
 
+/* Vote on the Single Tax: Hard votes for it when it closes the gap to the
+ * leader. */
 static int ai_vote(Game *g, int p, int proposer)
 {
     (void)proposer;
@@ -388,6 +415,8 @@ static int ai_vote(Game *g, int p, int proposer)
     }
 }
 
+/* Rule 9: join a railroad Trust? Always worth it, except to the impulsive
+ * Easy player. */
 static int ai_join_trust(Game *g, int p, int other)
 {
     (void)other;
@@ -420,6 +449,8 @@ static int best_lot_to_build(Game *g, int p)
     return best;
 }
 
+/* Before the throw: build houses while the cash allows (Hard keeps its
+ * buffer plus $150). */
 static void build_houses(Game *g, int p)
 {
     int d = diff(g, p);
@@ -453,6 +484,8 @@ static void trade_for_monopolies(Game *g, int p)
 
 static int last_proposal[MAXPLAYERS];
 
+/* Before the throw: propose the Single Tax if it would help this player
+ * (never more than once every few rounds). */
 static void maybe_propose(Game *g, int p)
 {
     if (g->single_tax || g->turn_no - last_proposal[p] < 6 * g->nplayers) return;
@@ -470,6 +503,8 @@ static void maybe_propose(Game *g, int p)
     game_propose_single_tax(g, p);
 }
 
+/* The computer player's business before it throws: trades (Hard), houses,
+ * the Single Tax. */
 static void pre_roll(Game *g, int p)
 {
     if (g->turn_no < g->nplayers) memset(last_proposal, 0, sizeof last_proposal);

@@ -24,7 +24,9 @@
 #   make check      the tests (hundreds of computer-only games, no display needed)
 #   make install    into $(prefix)/bin, the man page into $(mandir) (section 6,
 #                   games), and the menu entry and icons into $(datadir)
+#   make pdf        rebuild docs/viola-landlord-rules.pdf (needs pandoc + pdflatex)
 #   make dist       viola-landlord-VERSION.tar.gz, ready to build anywhere
+# INSTALL.md describes all of these.
 
 AM_CFLAGS = $(WARN_CFLAGS) $(X11_CFLAGS)
 
@@ -74,8 +76,54 @@ noinst_HEADERS = \
 
 man_MANS = viola-landlord.6
 
-EXTRA_DIST = viola-landlord.6.in README.md CHANGELOG.md COPYING autogen.sh .gitignore \
-	$(desktop_DATA) $(ICON_PNGS) icons/viola-landlord.svg icons/viola-landlord.xpm
+EXTRA_DIST = viola-landlord.6.in COPYING autogen.sh .gitignore \
+	$(desktop_DATA) $(ICON_PNGS) icons/viola-landlord.svg icons/viola-landlord.xpm \
+	$(PDF_SOURCES) docs/images/board-map.svg
+
+# ---- documents ----
+# Installed into $(docdir), normally $(prefix)/share/doc/viola-landlord: the
+# README, this build guide, the changes, the rules (Markdown and PDF) and the
+# pictures the rules show.
+dist_doc_DATA = README.md INSTALL.md CHANGELOG.md docs/RULES.md docs/viola-landlord-rules.pdf
+docimagesdir = $(docdir)/images
+DOC_IMAGES = \
+	docs/images/board-map.png \
+	docs/images/for-sale.png \
+	docs/images/game-board.png \
+	docs/images/joiner-view.png \
+	docs/images/new-game.png \
+	docs/images/the-deal.png \
+	docs/images/waiting-room.png \
+	docs/images/which-way.png
+dist_docimages_DATA = $(DOC_IMAGES)
+
+# ---- the rules PDF ----
+# docs/viola-landlord-rules.pdf ships ready-made. `make pdf` rebuilds it from
+# docs/RULES.md (and the board map from src/board.c), when configure found
+# pandoc and pdflatex. The PDF is written into the source tree, so it is
+# shipped and installed whether or not it was rebuilt.
+PDF_SOURCES = docs/rules-pdf.yaml docs/rules-pdf.lua docs/rules-header.tex docs/boardmap.c
+EXTRA_PROGRAMS = docs/boardmap
+docs_boardmap_SOURCES = docs/boardmap.c src/board.c
+docs_boardmap_CFLAGS = $(WARN_CFLAGS) -I$(top_srcdir)/src
+CLEANFILES = docs/boardmap$(EXEEXT)
+
+if HAVE_PANDOC
+pdf: docs/boardmap$(EXEEXT)
+	./docs/boardmap$(EXEEXT) > "$(srcdir)/docs/images/board-map.svg"
+	@if command -v rsvg-convert >/dev/null 2>&1; then \
+	    echo "  rsvg-convert docs/images/board-map.png"; \
+	    rsvg-convert -w 1600 "$(srcdir)/docs/images/board-map.svg" -o "$(srcdir)/docs/images/board-map.png"; \
+	else echo "(rsvg-convert not found: docs/images/board-map.png left as it is)"; fi
+	cd "$(srcdir)/docs" && $(PANDOC) --defaults=rules-pdf.yaml --lua-filter=rules-pdf.lua \
+	    -H rules-header.tex --pdf-engine="$(PDFLATEX)" --resource-path=. RULES.md -o viola-landlord-rules.pdf
+	@echo "Made docs/viola-landlord-rules.pdf"
+else
+pdf:
+	@echo "make pdf needs pandoc and pdflatex, which configure did not find."
+	@echo "The shipped docs/viola-landlord-rules.pdf is up to date with this release."
+endif
+.PHONY: pdf
 
 # ---- desktop ----
 # The menu entry and the icon (a house on a lot over a title deed, pixel art

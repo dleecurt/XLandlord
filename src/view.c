@@ -51,9 +51,9 @@
 #define GAP       8
 #define PANEL_MIN 340
 
-static char status_text[200];
-static PanelButton focus = PB_NONE;
-static int log_scroll;
+static char status_text[200];   /* the line above the buttons */
+static PanelButton focus = PB_NONE;    /* the button Enter presses */
+static int log_scroll;          /* lines the record of events is scrolled back */
 
 /* Where things were last drawn, for the hit tests. */
 static int bx0, by0, bsize, bcorner;
@@ -61,6 +61,7 @@ static UiRect buttons[PB_COUNT];
 
 static const char *const button_labels[PB_COUNT] = { "&Roll Dice", "&Build...", "&Trade...", "Standings" };
 
+/* See view.h. */
 void view_set_status(const char *fmt, ...)
 {
     va_list ap;
@@ -71,6 +72,7 @@ void view_set_status(const char *fmt, ...)
 
 void view_set_focus(PanelButton b) { focus = b; }
 
+/* See view.h. */
 void view_scroll_log(int n)
 {
     log_scroll = n ? MAX(0, log_scroll + n) : 0;
@@ -110,6 +112,7 @@ static UiRect space_rect(int sp)
     return r;
 }
 
+/* See view.h. */
 int view_space_at(int x, int y)
 {
     for (int i = 0; i < NSPACES; i++)
@@ -117,6 +120,7 @@ int view_space_at(int x, int y)
     return -1;
 }
 
+/* See view.h. */
 PanelButton view_button_at(int x, int y)
 {
     for (int i = 0; i < PB_COUNT; i++)
@@ -142,6 +146,7 @@ static int space_color(int sp)
     }
 }
 
+/* The picture of a space, or -1 for lots (they show their name and price). */
 static int space_art(int sp)
 {
     switch (board[sp].type) {
@@ -193,6 +198,7 @@ static int centered_lines(int font, const char *label, int x, int w, int y, int 
     return y;
 }
 
+/* The number of lines in a label. */
 static int count_lines(const char *s)
 {
     int n = 1;
@@ -200,6 +206,7 @@ static int count_lines(const char *s)
     return n;
 }
 
+/* A house in a player's color. */
 static void draw_house(int x, int y, int scale, int color)
 {
     xw_picture(x, y, art_rows(ART_HOUSE), scale, color, XC_INK);
@@ -217,6 +224,8 @@ static int inner_edge(int sp)
     }
 }
 
+/* One space: its color, picture or name, price and rent, the owner's mark
+ * and the houses, and the highlight. */
 static void draw_space(int sp)
 {
     const Game *g = &app.game;
@@ -323,6 +332,8 @@ static void draw_space(int sp)
     }
 }
 
+/* The players' checkers, up to four to a space; the current player's has a
+ * white dot, a jailed one bars. */
 static void draw_tokens(void)
 {
     const Game *g = &app.game;
@@ -382,6 +393,8 @@ static void center_box(int x, int y, int w, int h, const char *title, const char
     centered_lines(XF_BOLD, value, x, w, ty + lh, XC_INK);
 }
 
+/* The middle of the board: the title, the patent's four boxes, the dice and
+ * the newest event. */
 static void draw_center(void)
 {
     const Game *g = &app.game;
@@ -441,6 +454,7 @@ static void draw_center(void)
     }
 }
 
+/* The whole board at (x, y), S pixels square. */
 static void draw_board(int x, int y, int S)
 {
     bx0 = x;
@@ -468,8 +482,10 @@ static void draw_board(int x, int y, int S)
 
 /* ---- the panel ---- */
 
+/* The levels as shown after a computer player's name. */
 static const char *const diff_names[] = { "Easy", "Medium", "Hard" };
 
+/* A player's box in the panel; returns its height. */
 static int draw_player(int p, int x, int y, int w)
 {
     const Game *g = &app.game;
@@ -515,6 +531,7 @@ static int draw_player(int p, int x, int y, int w)
     return h;
 }
 
+/* The record of events, newest at the bottom, long lines wrapped. */
 static void draw_log(int x, int y, int w, int h)
 {
     const Game *g = &app.game;
@@ -550,6 +567,7 @@ static void draw_log(int x, int y, int w, int h)
     }
 }
 
+/* The side panel: players, status line, buttons, the record of events. */
 static void draw_panel(int x, int y, int w, int h)
 {
     const Game *g = &app.game;
@@ -588,6 +606,7 @@ static void draw_panel(int x, int y, int w, int h)
     draw_log(x, yy, w, y + h - yy);
 }
 
+/* See view.h. */
 void view_draw(void)
 {
     int W = xw_width(), H = xw_height();

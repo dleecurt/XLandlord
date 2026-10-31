@@ -41,6 +41,8 @@ static int title_height(void) { return xw_line_height(XF_UI) + 12; }
 
 static int is_enter(int k) { return k == '\n' || k == '\r'; }
 
+/* See ui.h: draw the game, then an empty dialog panel with its title;
+ * returns the area inside. */
 UiRect ui_frame(const char *title, int w, int h)
 {
     view_draw();
@@ -64,6 +66,8 @@ UiRect ui_frame(const char *title, int w, int h)
     return (UiRect){ x + UI_MARGIN, top, w - 2 * UI_MARGIN, y + h - UI_MARGIN - top };
 }
 
+/* Remove the & from a button label into `out`; returns the hotkey's
+ * position or -1. */
 static int split_amp(const char *label, char *out, size_t size)
 {
     int pos = -1;
@@ -76,6 +80,7 @@ static int split_amp(const char *label, char *out, size_t size)
     return pos;
 }
 
+/* The lowercase hotkey letter of a label, or 0. */
 static int hotkey_of(const char *label)
 {
     char shown[64];
@@ -83,6 +88,8 @@ static int hotkey_of(const char *label)
     return pos >= 0 ? tolower((unsigned char)shown[pos]) : 0;
 }
 
+/* See ui.h: a raised TextButton, its hotkey underlined, the focus box when
+ * focused. */
 void ui_button(UiRect r, const char *label, int focused)
 {
     char shown[64];
@@ -112,6 +119,7 @@ static void toggle_button(UiRect r, const char *label, int on, int focused)
     if (focused) xw_box(r.x + 4, r.y + 4, r.w - 8, r.h - 8, XC_INK);
 }
 
+/* See ui.h: a sunken edit field with a text cursor. */
 void ui_field(UiRect r, const char *text, int cursor)
 {
     xw_fill(r.x, r.y, r.w, r.h, XC_DARK);       /* Viola's edit-bg */
@@ -124,6 +132,7 @@ void ui_field(UiRect r, const char *text, int cursor)
     xw_clip_off();
 }
 
+/* See ui.h: break text into lines at spaces (and at newlines). */
 int ui_wrap(int font, const char *text, int width, char *buf, size_t size, const char **lines, int max)
 {
     copy_str(buf, size, text);
@@ -204,12 +213,14 @@ int ui_ask(const char *title, const char *text, const char *const *buttons, int 
     }
 }
 
+/* See ui.h. */
 int ui_yes_no(const char *title, const char *text, int def_yes)
 {
     static const char *const yn[] = { "&Yes", "&No" };
     return ui_ask(title, text, yn, 2, def_yes ? 0 : 1, 1) == 0;
 }
 
+/* See ui.h. */
 void ui_message(const char *title, const char *text)
 {
     static const char *const ok[] = { "OK" };
@@ -228,6 +239,7 @@ static void mini_scrollbar(int x, int y, int h, int top, int rows, int n)
     xw_fill(x + 1, y + pos, 2, len, XC_LIGHT);
 }
 
+/* See ui.h: arrows, Page Up/Down and the wheel scroll a long text. */
 void ui_info_box(const char *title, const char *const *lines)
 {
     int n = 0;
@@ -337,6 +349,7 @@ static void draw_list(const char *title, const char *note, const char *const *it
     g->list = list; g->ok = b[0]; g->cancel = b[1]; g->rows = rows; g->ih = ih;
 }
 
+/* See ui.h: arrows move, Enter or a double click chooses. */
 int ui_choose(const char *title, const char *note, const char *const *items, int n, int initial)
 {
     if (n <= 0) return -1;
@@ -447,6 +460,7 @@ static int entry(const char *title, const char *note, char *buf, size_t size, in
     }
 }
 
+/* See ui.h: digits only. */
 int ui_number(const char *title, const char *note, int *value)
 {
     char buf[12];
@@ -456,6 +470,7 @@ int ui_number(const char *title, const char *note, int *value)
     return 1;
 }
 
+/* See ui.h. */
 int ui_prompt(const char *title, const char *note, char *buf, size_t size)
 {
     return entry(title, note, buf, size, 0);

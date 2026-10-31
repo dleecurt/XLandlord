@@ -25,7 +25,7 @@ dnl config.h (PACKAGE_VERSION, see src/version.h). It starts at 0.0.1 and goes
 dnl up by one with every release.
 
 AC_PREREQ([2.69])
-AC_INIT([Viola the Landlord], [0.0.3], [], [viola-landlord])
+AC_INIT([Viola the Landlord], [0.0.4], [], [viola-landlord])
 AC_COPYRIGHT([Copyright (C) 2026 Lee Curtis
 License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>
 This is free software: you are free to change and redistribute it.
@@ -84,6 +84,18 @@ AS_IF([test "x$have_x11" != xyes],
 AC_SUBST([X11_CFLAGS])
 AC_SUBST([X11_LIBS])
 
+dnl ---- the rules PDF (optional) ----
+dnl docs/viola-landlord-rules.pdf ships ready-made; `make pdf` rebuilds it
+dnl from docs/RULES.md with pandoc and a LaTeX engine, when both are here.
+AC_ARG_VAR([PANDOC], [pandoc, to rebuild the rules PDF with make pdf])
+AC_ARG_VAR([PDFLATEX], [the LaTeX engine pandoc uses for the rules PDF])
+AC_CHECK_PROGS([PANDOC], [pandoc])
+AC_CHECK_PROGS([PDFLATEX], [pdflatex])
+AS_IF([test -n "$PANDOC" && test -n "$PDFLATEX"],
+  [pdf_note="make pdf rebuilds it with $PANDOC"],
+  [pdf_note="shipped copy (pandoc or pdflatex not found, so make pdf is off)"])
+AM_CONDITIONAL([HAVE_PANDOC], [test -n "$PANDOC" && test -n "$PDFLATEX"])
+
 AC_CONFIG_FILES([Makefile viola-landlord.6])
 AC_OUTPUT
 
@@ -92,4 +104,5 @@ AC_MSG_NOTICE([
     compiler:        $CC
     X11:             $X11_CFLAGS $X11_LIBS
     install prefix:  $prefix
+    rules PDF:       $pdf_note
   Next:  make   make check   make install])

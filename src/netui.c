@@ -37,8 +37,10 @@
 
 /* ---- keeping the window alive ---- */
 
-static int in_idle;
+static int in_idle;             /* (a dialog opened while idling must not idle again) */
 
+/* See netui.h: called while waiting on the network; Close asks whether to
+ * leave. */
 int netui_idle(void)
 {
     if (in_idle) return 0;
@@ -137,6 +139,8 @@ static int lobby(void)
     }
 }
 
+/* See netui.h: the computer player, length, rules and port; then the
+ * waiting room. */
 int netui_host_setup(GameSettings *s)
 {
     static const char *const cpus[] = { "Easy", "Medium", "Hard" };
@@ -179,7 +183,7 @@ int netui_host_setup(GameSettings *s)
 
 /* ---- joining ---- */
 
-static int client_started;
+static int client_started;      /* the host has sent START */
 
 /* The host has started the game: a fresh board to draw. */
 static void client_start(int me, int nplayers)
@@ -312,6 +316,7 @@ static void client_message(const NetMsg *m)
     }
 }
 
+/* See netui.h: handle up to a few hundred messages that have arrived. */
 void netui_client_pump(int ms)
 {
     NetMsg m;
@@ -370,6 +375,7 @@ static int waiting_room(void)
     }
 }
 
+/* See netui.h: the host's address, ssh, then the waiting room. */
 int netui_join(void)
 {
     char host[128];

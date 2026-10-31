@@ -49,8 +49,8 @@ App app;
 
 static int humans_in_game(const Game *g);
 static int remote_seat(int p);
-static int quit_requested;
-static int final_shown;
+static int quit_requested;      /* leave the main loop (Quit, or the window closed) */
+static int final_shown;         /* the final standings have been shown for this game */
 
 /* ---- for the menus ---- */
 
@@ -73,6 +73,8 @@ static void watch(int ms)
 
 static int cpu_turn(const Game *g) { return app.playing && !g->over && g->pl[g->cur].cpu; }
 
+/* The game changed: tell the joiners (when hosting), redraw, and slow down
+ * a little during computer turns. */
 static void hook_changed(Game *g)
 {
     if (net_role() == NET_HOST) net_broadcast(g);
@@ -82,6 +84,8 @@ static void hook_changed(Game *g)
     if (cpu_turn(g) && app.cpu_running && !quit_requested) watch(prefs_delay(&app.prefs) / 2);
 }
 
+/* The dice were thrown: let them tumble for a moment (not for computer
+ * players at fast speed). */
 static void hook_dice(Game *g, int d1, int d2)
 {
     (void)d1; (void)d2;
@@ -97,6 +101,8 @@ static void hook_dice(Game *g, int d1, int d2)
     xw_flush();
 }
 
+/* A Chance card: show it to the human who drew it (on his own screen if he
+ * is a joiner). */
 static void hook_chance(Game *g, int p, const char *text)
 {
     if (g->pl[p].cpu) return;
@@ -107,6 +113,8 @@ static void hook_chance(Game *g, int p, const char *text)
     ui_message(title, text);
 }
 
+/* After a computer player's turn: wait a moment, or for a key with Confirm
+ * Each Computer Move. */
 static void hook_pause(Game *g, int p)
 {
     if (p < 0 || !g->pl[p].cpu || quit_requested) return;
@@ -131,6 +139,7 @@ static unsigned long time_seed(void)
     return (unsigned long)time(NULL) * 2654435761UL ^ (unsigned long)getpid();
 }
 
+/* Names for computer players at a hot-seat table, after the board's villains. */
 static const char *const cpu_names[] = { "Lord Blueblood", "Mr. D. F. Hogg", "Mrs. Soakum", "Mr. Slambang" };
 
 /* Humans at this screen: not computer players, not network joiners. */
@@ -157,6 +166,7 @@ static void notify(int p, const char *title, const char *text)
 /* A joiner's command goes to the host as an ACTION. */
 static int joiner(void) { return net_role() == NET_CLIENT; }
 
+/* Send an ACTION to the host (joiners only). */
 static void send_action(int kind, int a, int b, int c)
 {
     int n[4] = { kind, a, b, c };
@@ -166,6 +176,7 @@ static void send_action(int kind, int a, int b, int c)
 /* The human whose turn was last, for the "Pass to ..." prompt. */
 static int last_human = -1;
 
+/* Connect the game's hooks to the window. */
 static void set_hooks(Game *g)
 {
     g->hooks.changed = hook_changed;
@@ -200,6 +211,8 @@ static void begin(Game *g)
     app.cpu_running = 0;
 }
 
+/* Start a game at this screen from the seats in the preferences (hot-seat
+ * humans and computer players). */
 static void start_game(void)
 {
     GameSettings s;
@@ -234,6 +247,8 @@ static void start_game(void)
  * the joiners' seats played through net_decider. */
 static int host_action(Game *g, int p, const NetMsg *m);
 
+/* Host a network game: the setup form and waiting room (netui.c), then a
+ * game whose joiners' seats use net_decider. */
 static void start_network_game(void)
 {
     GameSettings s;
@@ -296,6 +311,7 @@ static int settings_form(const char *title, const char *ok)
     return 1;
 }
 
+/* Game > New Game: the seats form, then a new game at this screen. */
 static void cmd_new_game(void)
 {
     if (app.playing && !app.game.over &&
@@ -307,12 +323,14 @@ static void cmd_new_game(void)
     start_game();
 }
 
+/* Options > Game Settings: the same form, for the next game. */
 static void cmd_settings(void)
 {
     if (!settings_form("Game Settings", "OK")) return;
     if (app.playing) ui_message("Game Settings", "The new settings take effect in the next game.");
 }
 
+/* Options > Computer Speed. */
 static void cmd_speed(void)
 {
     static const char *const items[] = { "Fast", "Normal", "Slow" };
@@ -354,6 +372,7 @@ static int seat_accepts_purchase(int buyer, int seller, int sp, int price)
     return human_accepts_purchase(g, buyer, seller, sp, price);
 }
 
+/* Build a house for p (a joiner sends it to the host). */
 static void act_build(int p, int sp)
 {
     if (joiner()) { send_action(NX_BUILD, sp, 0, 0); return; }
@@ -361,6 +380,8 @@ static void act_build(int p, int sp)
     if (err) notify(p, "Build a House", err);
 }
 
+/* `buyer` offers `price` to `seller` for card sp; the seller is asked
+ * wherever he sits. */
 static void act_trade_buy(int buyer, int seller, int sp, int price)
 {
     if (joiner()) { send_action(NX_TRADE_BUY, seller, sp, price); return; }
@@ -382,6 +403,8 @@ static void act_trade_buy(int buyer, int seller, int sp, int price)
     if (humans_in_game(g) > 1 && !g->pl[seller].cpu && !remote_seat(seller)) last_human = seller;
 }
 
+/* `seller` asks `price` of `buyer` for card sp; the buyer is asked wherever
+ * he sits. */
 static void act_trade_sell(int seller, int buyer, int sp, int price)
 {
     if (joiner()) { send_action(NX_TRADE_SELL, buyer, sp, price); return; }
@@ -419,6 +442,7 @@ static void act_sell(int p, int kind, int sp, int buyer)
     if (err) notify(p, "Sell", err);
 }
 
+/* p proposes the Single Tax. */
 static void act_propose(int p)
 {
     if (joiner()) { send_action(NX_PROPOSE, 0, 0, 0); return; }
@@ -453,6 +477,7 @@ static int host_action(Game *g, int p, const NetMsg *m)
     return 0;
 }
 
+/* Game > Build a House: choose a lot, repeatedly. */
 static void cmd_build(void)
 {
     Game *g = &app.game;
@@ -490,6 +515,7 @@ static int tradable(const Game *g, int sp)
     return !(g->single_tax && board[sp].type == T_LOT) && !(g->houses[sp] && !g->single_tax);
 }
 
+/* Game > Buy a Card from a Player: choose the card and make an offer. */
 static void cmd_trade_buy(void)
 {
     Game *g = &app.game;
@@ -517,6 +543,8 @@ static void cmd_trade_buy(void)
     act_trade_buy(p, o, sp, offer);
 }
 
+/* Game > Sell a Card to a Player: choose the card and the buyer (a computer
+ * player's offer, or a price named to a human). */
 static void cmd_trade_sell(void)
 {
     Game *g = &app.game;
@@ -571,6 +599,8 @@ static void cmd_trade_sell(void)
     act_trade_sell(p, q, sp, ask);
 }
 
+/* Game > Sell to the Pack: sell cards, houses, or to a computer player at
+ * his offer. */
 static void cmd_sell_pack(void)
 {
     Game *g = &app.game;
@@ -586,6 +616,7 @@ static void cmd_sell_pack(void)
     }
 }
 
+/* Game > Propose the Single Tax. */
 static void cmd_single_tax(void)
 {
     if (!ui_yes_no("The Single Tax",
@@ -596,6 +627,8 @@ static void cmd_single_tax(void)
     act_propose(me());
 }
 
+/* Game > Standings (and the final scores): every player's cash, cards,
+ * houses and worth, richest first. */
 static void cmd_scores(const char *title)
 {
     const Game *g = &app.game;
@@ -679,6 +712,7 @@ static void cmd_space_info(int sp)
     app.highlight = save;
 }
 
+/* Help > About. */
 static void cmd_about(void)
 {
     ui_message("About Viola the Landlord",
@@ -695,6 +729,7 @@ static void leave_network(const char *why)
     if (net_role() != NET_NONE) net_close(why);
 }
 
+/* Game > Host a Network Game. */
 static void cmd_net_host(void)
 {
     if (joiner()) { ui_message("Host a Network Game", "Leave the game you have joined first."); return; }
@@ -704,6 +739,7 @@ static void cmd_net_host(void)
     start_network_game();
 }
 
+/* Game > Join a Network Game. */
 static void cmd_net_join(void)
 {
     if (app.playing && !app.game.over && !ui_yes_no("Join a Network Game", "Abandon the game in progress?", 0))
@@ -713,6 +749,7 @@ static void cmd_net_join(void)
     netui_join();
 }
 
+/* Roll Dice: play the current human's turn (a joiner asks the host to). */
 static void roll(void)
 {
     if (!app_can_act()) return;
@@ -722,6 +759,7 @@ static void roll(void)
     game_turn(&app.game);
 }
 
+/* Do a menu command. */
 static void run_command(Command c)
 {
     switch (c) {
@@ -780,6 +818,7 @@ static void update_status(void)
     }
 }
 
+/* A key or click in the main window, outside any dialog. */
 static void handle_key(int k)
 {
     if (k == K_MOUSE) {
@@ -832,6 +871,8 @@ static void handle_key(int k)
     }
 }
 
+/* Start-up: the relay mode for ssh, the command line, the window, the main
+ * loop. */
 int main(int argc, char **argv)
 {
     /* Started by a joiner's ssh on the host's machine: be the relay. */

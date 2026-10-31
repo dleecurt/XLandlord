@@ -24,3 +24,4 @@ build-aux/
 .dirstamp
 configure~
 viola-landlord-*/
+docs/boardmap

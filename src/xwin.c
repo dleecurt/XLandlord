@@ -47,15 +47,15 @@
 
 XwMouse xw_mouse;
 
-static Display *dpy;
-static int scr;
-static Window win;
-static Pixmap back;
-static GC gc;
-static int W, H;
-static int depth;
-static Atom wm_delete;
-static Pixmap icon_pixmap, icon_mask;
+static Display *dpy;            /* the connection to the X server */
+static int scr;                 /* its default screen */
+static Window win;              /* our one top-level window */
+static Pixmap back;             /* the off-screen copy everything is drawn into */
+static GC gc;                   /* color, font and clipping for all drawing */
+static int W, H;                /* the window's size */
+static int depth;               /* bits per pixel of the screen */
+static Atom wm_delete;          /* WM_DELETE_WINDOW: the close button */
+static Pixmap icon_pixmap, icon_mask;   /* the classic X icon, for older window managers */
 
 /* ---- colors ---- */
 
@@ -80,8 +80,10 @@ static const char *const color_spec[XC_COUNT] = {
     [XC_PLAYER3]   = "#806a00",     /* brass */
     [XC_WHITE]     = "#ffffff",
 };
-static unsigned long pixels[XC_COUNT];
+static unsigned long pixels[XC_COUNT];      /* XC_* -> the server's pixel value */
 
+/* Allocate the palette (falling back to black or white on a full 8-bit
+ * display). */
 static void alloc_colors(void)
 {
     Colormap cm = DefaultColormap(dpy, scr);
@@ -96,7 +98,7 @@ static void alloc_colors(void)
 
 /* ---- fonts ---- */
 
-static XFontStruct *fonts[XF_COUNT];
+static XFontStruct *fonts[XF_COUNT];        /* XF_* -> the font loaded for it */
 
 /* Viola's fonts first (Adobe Helvetica, misc-fixed), then looser patterns
  * so a scalable font can stand in. Each list names the size in pixels. */
@@ -136,6 +138,7 @@ static const char *const logo_names[] = {
     NULL
 };
 
+/* The first of `names` the server has, or NULL. */
 static XFontStruct *load_font(const char *const *names)
 {
     for (int i = 0; names[i]; i++) {
@@ -148,6 +151,7 @@ static XFontStruct *load_font(const char *const *names)
 int xw_ascent(int font)  { return fonts[font]->ascent; }
 int xw_descent(int font) { return fonts[font]->descent; }
 
+/* See xwin.h. */
 int xw_text(int font, int x, int y, const char *s, int n, int color)
 {
     if (n <= 0) return 0;
@@ -157,6 +161,7 @@ int xw_text(int font, int x, int y, const char *s, int n, int color)
     return XTextWidth(fonts[font], s, n);
 }
 
+/* See xwin.h. */
 int xw_text_width(int font, const char *s, int n)
 {
     return n > 0 ? XTextWidth(fonts[font], s, n) : 0;
@@ -174,6 +179,7 @@ void xw_fill(int x, int y, int w, int h, int color)
 void xw_hline(int x, int y, int w, int color) { xw_fill(x, y, w, 1, color); }
 void xw_vline(int x, int y, int h, int color) { xw_fill(x, y, 1, h, color); }
 
+/* See xwin.h. */
 void xw_line(int x1, int y1, int x2, int y2, int color)
 {
     XSetForeground(dpy, gc, pixels[color]);
@@ -195,6 +201,7 @@ static void bevel(int x, int y, int w, int h, int tl, int br)
 void xw_raised(int x, int y, int w, int h) { bevel(x, y, w, h, XC_LIGHT, XC_DARK); }
 void xw_sunken(int x, int y, int w, int h) { bevel(x, y, w, h, XC_DARK, XC_LIGHT); }
 
+/* See xwin.h. */
 void xw_box(int x, int y, int w, int h, int color)
 {
     if (w < 2 || h < 2) return;
@@ -202,6 +209,7 @@ void xw_box(int x, int y, int w, int h, int color)
     XDrawRectangle(dpy, back, gc, x, y, (unsigned)(w - 1), (unsigned)(h - 1));
 }
 
+/* See xwin.h. */
 void xw_triangle(int x, int y, int size, int dir, int color)
 {
     int half = size / 2, q = size / 4;
@@ -210,18 +218,21 @@ void xw_triangle(int x, int y, int size, int dir, int color)
     xw_polygon(dir == 0 ? down : up, 3, color);
 }
 
+/* See xwin.h. */
 void xw_disc(int x, int y, int d, int color)
 {
     XSetForeground(dpy, gc, pixels[color]);
     XFillArc(dpy, back, gc, x, y, (unsigned)d, (unsigned)d, 0, 360 * 64);
 }
 
+/* See xwin.h. */
 void xw_circle(int x, int y, int d, int color)
 {
     XSetForeground(dpy, gc, pixels[color]);
     XDrawArc(dpy, back, gc, x, y, (unsigned)(d - 1), (unsigned)(d - 1), 0, 360 * 64);
 }
 
+/* See xwin.h. */
 void xw_polygon(const int *xy, int npoints, int color)
 {
     XPoint p[16];
@@ -231,6 +242,7 @@ void xw_polygon(const int *xy, int npoints, int color)
     XFillPolygon(dpy, back, gc, p, npoints, Complex, CoordModeOrigin);
 }
 
+/* See xwin.h: batched into two XFillRectangles calls. */
 void xw_picture(int x, int y, const char *const *rows, int scale, int color, int color2)
 {
     XRectangle r1[1024], r2[1024];
@@ -252,6 +264,7 @@ void xw_picture(int x, int y, const char *const *rows, int scale, int color, int
     }
 }
 
+/* See xwin.h. */
 void xw_clip(int x, int y, int w, int h)
 {
     XRectangle r = { (short)x, (short)y, (unsigned short)MAX(0, w), (unsigned short)MAX(0, h) };
@@ -265,6 +278,7 @@ void xw_clip_off(void) { XSetClipMask(dpy, gc, None); }
 int xw_width(void)  { return W; }
 int xw_height(void) { return H; }
 
+/* (Re)make the off-screen copy at the window's size. */
 static void make_back(void)
 {
     if (back) XFreePixmap(dpy, back);
@@ -272,6 +286,7 @@ static void make_back(void)
     xw_fill(0, 0, W, H, XC_SURFACE);
 }
 
+/* See xwin.h. */
 void xw_flush(void)
 {
     XCopyArea(dpy, back, win, gc, 0, 0, (unsigned)W, (unsigned)H, 0, 0);
@@ -280,12 +295,14 @@ void xw_flush(void)
 
 void xw_bell(void) { XBell(dpy, 0); XFlush(dpy); }
 
+/* See xwin.h. */
 void xw_set_title(const char *title)
 {
     XStoreName(dpy, win, title);
     XSetIconName(dpy, win, title);
 }
 
+/* See xwin.h. */
 int xw_open(void)
 {
     dpy = XOpenDisplay(NULL);
@@ -372,6 +389,8 @@ static void set_icons(void)
     XFreeGC(dpy, gm);
 }
 
+/* See xwin.h: size hints, class, icons, the close button, then wait for the
+ * map. */
 void xw_show(int argc, char **argv, int w, int h)
 {
     W = w > 0 ? w : 1120;
@@ -411,6 +430,7 @@ void xw_show(int argc, char **argv, int w, int h)
     }
 }
 
+/* See xwin.h. */
 void xw_close(void)
 {
     if (!dpy) return;
@@ -467,6 +487,8 @@ static int translate_key(XKeyEvent *e)
     return ERR;
 }
 
+/* Fill xw_mouse from a press; two quick presses of one button in one place
+ * make a double click. */
 static void read_button(XButtonEvent *b)
 {
     static Time last_time;
@@ -516,6 +538,7 @@ static int handle(XEvent *ev)
     }
 }
 
+/* See xwin.h. */
 int xw_next_key(void)
 {
     for (;;) {
@@ -526,6 +549,7 @@ int xw_next_key(void)
     }
 }
 
+/* See xwin.h: select() on the X connection until the deadline. */
 int xw_wait_key(int ms)
 {
     struct timeval end, now;
@@ -552,6 +576,7 @@ int xw_wait_key(int ms)
     }
 }
 
+/* See xwin.h: keys and clicks are dropped, other events handled. */
 void xw_drain(void)
 {
     while (XPending(dpy)) {

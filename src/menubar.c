@@ -70,6 +70,7 @@ static const Menu menus[NMENUS] = {
         { "&About",                    NULL,     CMD_ABOUT,        NULL, NULL } } },
 };
 
+/* The number of items in a menu (the list ends at the first empty label). */
 static int item_count(const Menu *m)
 {
     int c = 0;
@@ -77,6 +78,8 @@ static int item_count(const Menu *m)
     return c;
 }
 
+/* Remove the & from a label into `shown`; returns where the hotkey letter
+ * is, or -1. */
 static int split_label(const char *label, char *shown, size_t size)
 {
     int pos = -1;
@@ -98,14 +101,17 @@ static int item_enabled(const MenuItem *it) { return !it->enabled || it->enabled
 #define LABEL_GAP   6
 #define TITLE_GAP   18
 
+/* See menubar.h: one line of the interface font plus padding. */
 int menubar_height(void) { return xw_line_height(XF_UI) + 12; }
 
+/* The width of menu title i, with its triangle. */
 static int title_width(int i)
 {
     const char *t = menus[i].title;
     return TITLE_PAD + TRIANGLE + LABEL_GAP + xw_text_width(XF_UI, t, (int)strlen(t)) + TITLE_PAD;
 }
 
+/* Where menu title i starts. */
 static int title_x(int i)
 {
     int x = PAD + 6;
@@ -113,6 +119,7 @@ static int title_x(int i)
     return x;
 }
 
+/* See menubar.h: which title is under (x, y). */
 int menubar_hit(int x, int y)
 {
     if (y < PAD || y >= PAD + menubar_height()) return -1;
@@ -123,6 +130,7 @@ int menubar_hit(int x, int y)
     return -1;
 }
 
+/* See menubar.h: the menu whose title begins with c. */
 int menubar_for_letter(int c)
 {
     for (int i = 0; i < NMENUS; i++)
@@ -130,11 +138,13 @@ int menubar_for_letter(int c)
     return -1;
 }
 
+/* Underline the character at byte `pos` of s, drawn at (x, y). */
 static void underline(int font, int x, int y, const char *s, int pos, int color)
 {
     xw_hline(x + xw_text_width(font, s, pos), y + 2, xw_text_width(font, s + pos, 1), color);
 }
 
+/* See menubar.h: the bar, with the marked title boxed while it is in use. */
 void menubar_draw(int active)
 {
     int x = PAD, y = PAD, w = xw_width() - 2 * PAD, h = menubar_height();
@@ -161,6 +171,7 @@ typedef struct {
 #define DD_INSET 4
 #define DD_CHECK 18
 
+/* Work out the size and place of menu m's drop-down. */
 static void measure(int m, Dropdown *d)
 {
     const Menu *mn = &menus[m];
@@ -179,6 +190,7 @@ static void measure(int m, Dropdown *d)
     d->y = PAD + menubar_height();
 }
 
+/* Draw an open drop-down with item `sel` boxed; disabled items in gray. */
 static void draw_dropdown(int m, const Dropdown *d, int sel)
 {
     const Menu *mn = &menus[m];
@@ -203,12 +215,14 @@ static void draw_dropdown(int m, const Dropdown *d, int sel)
     }
 }
 
+/* An item was chosen: its command, or a bell if it is disabled. */
 static Command choose(const MenuItem *it)
 {
     if (!item_enabled(it)) { xw_bell(); return CMD_NONE; }
     return it->cmd;
 }
 
+/* See menubar.h: run the bar until something is chosen or it is closed. */
 Command menubar_run(int m, int open, void (*redraw)(void))
 {
     int sel = 0;

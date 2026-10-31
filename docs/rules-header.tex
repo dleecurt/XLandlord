@@ -1,0 +1,44 @@
+% docs/rules-header.tex - LaTeX settings for the PDF of RULES.md (make pdf).
+% A book face for the text, Helvetica for headings (the Viola browser's
+% font), the palette of the game for rules and table heads.
+\usepackage[T1]{fontenc}
+\usepackage{mathpazo}
+\usepackage[scaled=0.92]{helvet}
+\usepackage{xcolor}
+\definecolor{violagray}{HTML}{F0F0F0}
+\definecolor{violadark}{HTML}{909090}
+\definecolor{lotgreen}{HTML}{5B7F4A}
+\usepackage{titlesec}
+\titleformat{\section}{\sffamily\Large\bfseries}{}{0pt}{}[{\color{violadark}\titlerule[0.6pt]}]
+\titleformat{\subsection}{\sffamily\large\bfseries}{}{0pt}{}
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\sffamily\small The Landlord's Game}
+\fancyhead[R]{\sffamily\small Viola the Landlord}
+\fancyfoot[C]{\sffamily\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\usepackage{float}
+\floatplacement{figure}{H}
+\usepackage{caption}
+\captionsetup{font={small,sf},labelformat=empty}
+\setlength{\parskip}{0.45em}
+\setlength{\parindent}{0pt}
+\usepackage{etoolbox}
+\AtBeginEnvironment{longtable}{\small}
+\AtBeginEnvironment{verbatim}{\small}
+% The title in Helvetica, the contents on a page of their own.
+\usepackage{titling}
+\pretitle{\begin{center}\sffamily\bfseries\huge}
+\posttitle{\par\end{center}\vskip 0.4em}
+\preauthor{\begin{center}\sffamily\large}
+\postauthor{\par\end{center}}
+\predate{\begin{center}\sffamily}
+\postdate{\par\end{center}}
+\let\oldtableofcontents\tableofcontents
+\renewcommand{\tableofcontents}{{\setlength{\parskip}{0pt}\oldtableofcontents}\clearpage}
+% A compact contents list (one page), and a little air between table rows.
+\makeatletter
+\renewcommand{\l@section}{\@dottedtocline{1}{0em}{2em}}
+\makeatother
+\renewcommand{\arraystretch}{1.2}

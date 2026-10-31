@@ -25,6 +25,7 @@
 
 #include "util.h"
 
+/* See util.h. */
 void *xrealloc(void *p, size_t n)
 {
     void *q = realloc(p, n ? n : 1);
@@ -35,6 +36,7 @@ void *xrealloc(void *p, size_t n)
     return q;
 }
 
+/* See util.h. */
 void copy_str(char *dst, size_t size, const char *src)
 {
     if (!size) return;

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.0.4 - 2026-10-31
+
+- INSTALL.md: a full build and install guide (packages for Debian/Ubuntu,
+  Fedora, Arch and NetBSD, configure options, make targets, what is
+  installed where, uninstalling, network-play needs, troubleshooting).
+- docs/RULES.md: the complete rule book and how-to-play guide, with
+  screenshots, a numbered board map, the history of the game and a
+  quick-reference page; and docs/viola-landlord-rules.pdf made from it.
+- `make pdf` rebuilds the PDF (and the board map, from the game's own board
+  data, by docs/boardmap.c) when configure finds pandoc and pdflatex; the
+  PDF ships ready-made otherwise.
+- `make install` installs the documents in $(docdir).
+- Every function in the sources now has a comment saying what it does.
+
 ## 0.0.3 - 2026-10-31
 
 - Network play over ssh. One player hosts (Game > Host a Network Game) and

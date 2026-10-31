@@ -30,6 +30,7 @@
 #include "view.h"
 #include "xwin.h"
 
+/* Player p's name, for messages. */
 static const char *nm(const Game *g, int p) { return g->pl[p].name; }
 
 /* Humans sharing this screen (remote players have their own). */
@@ -67,6 +68,7 @@ static int ask_at(int sp, const char *title, const char *text, const char *const
 static const int *deal_cards;
 static int deal_n, deal_cash;
 
+/* The footer of the deal's check list: the total and what would be left. */
 static void deal_footer(const int *checked, char *out, size_t size)
 {
     int total = 0;
@@ -74,6 +76,8 @@ static void deal_footer(const int *checked, char *out, size_t size)
     snprintf(out, size, "Total $%d; you would keep $%d.", total, deal_cash - total);
 }
 
+/* Rule 1: the cards dealt to p, as a check list; refuses a choice he cannot
+ * pay for. */
 static void deal_buy(Game *g, int p, const int *cards, int n, int *want)
 {
     if (n <= 0) return;
@@ -132,6 +136,8 @@ static void describe_card(const Game *g, int sp, char *out, size_t size)
     }
 }
 
+/* Rule 7: buy sp at `price` (the sale price, or the highest bid when
+ * another player bid more)? */
 static int h_buy(Game *g, int p, int sp, int price, int high_bidder)
 {
     char text[600], what[160];
@@ -150,6 +156,8 @@ static int h_buy(Game *g, int p, int sp, int price, int high_bidder)
     return ask_at(sp, TT("For Sale (Rule 7)"), text, b, 2, 0, 1) == 0;
 }
 
+/* Rule 7: another player stopped on unowned sp; how much will p bid (0 =
+ * none)? Not asked when Options > Ask Me to Bid is off. */
 static int h_max_bid(Game *g, int p, int sp, int min)
 {
     if (!app.prefs.ask_bids) return 0;
@@ -180,6 +188,7 @@ static int h_jail_pay(Game *g, int p)
     return ui_ask(TT("Jail (Rule 6)"), text, b, 2, 1, -1) == 0;
 }
 
+/* Rule 17: use the railroad pass a double gives? */
 static int h_use_pass(Game *g, int p, int with, int without)
 {
     (void)p;
@@ -196,6 +205,7 @@ static int h_use_pass(Game *g, int p, int with, int without)
     return ask_at(with, TT("Railroad Pass (Rule 17)"), text, b, 2, 0, -1) == 0;
 }
 
+/* Rule 2: forward or backward between the Chances? */
 static int h_direction(Game *g, int p, int fwd, int back)
 {
     (void)g; (void)p;
@@ -207,6 +217,7 @@ static int h_direction(Game *g, int p, int fwd, int back)
     return ask_at(fwd, TT("Which Way? (Rule 2)"), text, b, 2, 0, -1) == 0;
 }
 
+/* Rule 8: play the broker's game, or refuse to move? */
 static int h_speculate(Game *g, int p)
 {
     char text[400];
@@ -220,6 +231,7 @@ static int h_speculate(Game *g, int p)
     return ask_at(21, TT("Speculation (Rule 8)"), text, b, 2, 0, -1) == 0;
 }
 
+/* Rule 13: buy the luxury, or move backward? */
 static int h_luxury(Game *g, int p)
 {
     char text[300];
@@ -230,6 +242,7 @@ static int h_luxury(Game *g, int p)
     return ask_at(g->pl[p].pos, TT("Luxury (Rule 13)"), text, b, 2, 0, -1) == 0;
 }
 
+/* Single Tax Rule 4: build on the unimproved lot just landed on? */
 static int h_st_build(Game *g, int p, int sp)
 {
     char text[300];
@@ -290,6 +303,7 @@ int human_choose_sale(Game *g, int p, const char *title, const char *note, int n
     return 1;
 }
 
+/* See human.h: choose a sale and carry it out at once. */
 int human_sell_menu(Game *g, int p, const char *title, const char *note, int need)
 {
     int kind, sp, buyer, price;
@@ -301,6 +315,8 @@ int human_sell_menu(Game *g, int p, const char *title, const char *note, int nee
     return 1;
 }
 
+/* See human.h: what to sell to find `need` dollars, asking again before
+ * giving up. */
 int human_raise_choice(Game *g, int p, int need, int *kind, int *sp, int *buyer)
 {
     char note[300];
@@ -317,6 +333,7 @@ int human_raise_choice(Game *g, int p, int need, int *kind, int *sp, int *buyer)
     }
 }
 
+/* The Decider's raise: choose a sale and carry it out, or give up (0). */
 static int h_raise(Game *g, int p, int need)
 {
     char note[300];
@@ -346,6 +363,7 @@ static int h_vote(Game *g, int p, int proposer)
     return ui_yes_no(TT("The Single Tax"), text, 0);
 }
 
+/* Rule 9: join the other owner of the railroads in a Trust? */
 static int h_join_trust(Game *g, int p, int other)
 {
     (void)p;
@@ -370,6 +388,7 @@ int human_accepts_sale(Game *g, int seller, int buyer, int sp, int price)
     return ask_at(sp, TT("An Offer"), text, b, 2, 1, 1) == 0;
 }
 
+/* See human.h: the buyer is asked whether he will pay the seller's price. */
 int human_accepts_purchase(Game *g, int buyer, int seller, int sp, int price)
 {
     char text[400];
