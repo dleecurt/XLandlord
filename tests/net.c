@@ -47,6 +47,7 @@
 #include "ai.h"
 #include "game.h"
 #include "net.h"
+#include "util.h"
 
 static int failures;
 #define CHECK(cond, ...) do { if (!(cond)) { failures++; printf("FAIL: " __VA_ARGS__); printf("\n"); fflush(stdout); } } while (0)
@@ -155,9 +156,16 @@ static void addresses(void)
 
 static int robot_idle(void) { return 0; }
 
-/* Join as `name`, answer every question, throw on every turn; leave after
- * `leave_after` of its own turns (0: never). Exit status: 0 played to the
- * end, 2 could not join, 3 turned away with the full-table warning. */
+/* What a robot does after `leave_after` of its own turns. */
+enum { R_QUIT, R_DROP_BACK, R_DROP_GONE, R_STALL };
+static int robot_mode = R_QUIT;
+
+/* Join as `name`, answer every question, throw on every turn. After
+ * `leave_after` of its own turns (0: never) it quits with a BYE (R_QUIT),
+ * loses its connection and comes back two seconds later (R_DROP_BACK), loses
+ * it for good (R_DROP_GONE), or stops answering (R_STALL). Exit status: 0
+ * played to the end, 2 could not join, 3 turned away with the full-table
+ * warning, 4 taken out for not answering, 5 could not rejoin. */
 static void robot(const char *name, int leave_after)
 {
     char err[1024];
@@ -174,7 +182,7 @@ static void robot(const char *name, int leave_after)
         if (r == 0) continue;
         switch (m.kind) {
         case NM_START: me = m.num[0]; break;
-        case NM_BYE:   _exit(0);
+        case NM_BYE:   _exit(strstr(m.text, "did not answer") ? 4 : 0);
         case NM_ASK: {
             int ans = 0;
             switch (m.num[1]) {
@@ -188,7 +196,23 @@ static void robot(const char *name, int leave_after)
         }
         case NM_TURN:
             if (m.num[0] != me) break;
-            if (leave_after && ++turns >= leave_after) { net_close(NULL); _exit(0); }
+            if (leave_after && ++turns == leave_after) {
+                if (robot_mode == R_QUIT) { net_close("A player has left."); _exit(0); }
+                if (robot_mode == R_DROP_GONE) { net_close(NULL); _exit(0); }
+                if (robot_mode == R_STALL) {        /* never answers again; waits for the BYE */
+                    for (;;) {
+                        int r2 = net_client_recv(&m, 2000);
+                        if (r2 < 0) _exit(0);
+                        if (r2 > 0 && m.kind == NM_BYE) _exit(strstr(m.text, "did not answer") ? 4 : 0);
+                    }
+                }
+                /* R_DROP_BACK: the line goes dead (no BYE), then the same
+                 * player comes back from the same machine. */
+                net_close(NULL);
+                sleep(2);
+                if (net_join(where, port, self, name, err, sizeof err) < 0) _exit(5);
+                break;          /* START, PLAYERs, STATE and the question again follow */
+            }
             {
                 int a[4] = { NX_ROLL, 0, 0, 0 };
                 net_client_send(NM_ACTION, a, 4, NULL);
@@ -347,6 +371,53 @@ int main(int argc, char **argv)
     CHECK(cpus == 1, "%d computer players at the end (want exactly 1)", cpus);
     net_close("Game over.");
     { int st = wait_child(quitter); CHECK(st == 0, "quitter exited %d", st); }
+
+    /* 6. a dropped connection, back in time: the same seat, the game goes on. */
+    net_set_timers(20, 60);
+    port++;
+    CHECK(net_host(port, err, sizeof err) == 0, "host (reconnect): %s", err);
+    robot_mode = R_DROP_BACK;
+    pid_t back = spawn_robot("Fay", 3);
+    CHECK(wait_lobby(1), "Fay in the lobby");
+    play_hosted(&g, &np, &over);
+    CHECK(over, "the game with a reconnect did not end");
+    CHECK(!g.pl[1].left, "Fay came back but was taken out of the game");
+    int saw_back = 0;
+    for (int i = MAX(0, g.log_count - LOG_LINES); i < g.log_count; i++)
+        if (strstr(g.log[i % LOG_LINES], "is back at the table")) saw_back = 1;
+    CHECK(saw_back, "the record does not say Fay came back");
+    net_close("Game over.");
+    { int st = wait_child(back); CHECK(st == 0, "reconnecting robot exited %d", st); }
+
+    /* 7. a dropped connection, not back in time: he leaves the game. */
+    net_set_timers(3, 60);
+    port++;
+    CHECK(net_host(port, err, sizeof err) == 0, "host (gone): %s", err);
+    robot_mode = R_DROP_GONE;
+    pid_t gone = spawn_robot("Gus", 3);
+    CHECK(wait_lobby(1), "Gus in the lobby");
+    play_hosted(&g, &np, &over);
+    CHECK(over, "the game after a lost player did not end");
+    CHECK(g.pl[1].left, "Gus never came back but is still at the table");
+    net_close("Game over.");
+    { int st = wait_child(gone); CHECK(st == 0, "vanishing robot exited %d", st); }
+
+    /* 8. a player who stops answering: warned (on his side), then taken out. */
+    net_set_timers(30, 2);
+    net_set_warning(1, 1);
+    port++;
+    CHECK(net_host(port, err, sizeof err) == 0, "host (stall): %s", err);
+    robot_mode = R_STALL;
+    pid_t stall = spawn_robot("Hal", 3);
+    CHECK(wait_lobby(1), "Hal in the lobby");
+    play_hosted(&g, &np, &over);
+    CHECK(over, "the game with a silent player did not end");
+    CHECK(g.pl[1].left, "Hal stopped answering but was never taken out");
+    net_close("Game over.");
+    { int st = wait_child(stall); CHECK(st == 4, "the silent robot was not told it did not answer (exit %d)", st); }
+    robot_mode = R_QUIT;
+    net_set_warning(NET_WARN_SECS, NET_GRACE_SECS);
+    net_set_timers(120, 120);
 
     if (failures) { printf("%d check(s) failed\n", failures); return 1; }
     return 0;

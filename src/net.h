@@ -46,6 +46,23 @@
  *   drop); he is out of the game - his cards go back into the pack and his
  *   houses come down (game_player_leaves) - and nobody takes his seat.
  *
+ *   TIMERS (the host sets both when he opens the game; 1, 2 or 5 minutes):
+ *   - Reconnecting. If a joiner's connection drops (not a BYE: that is a
+ *     deliberate goodbye), his seat waits for him. His game retries ssh by
+ *     itself; whoever comes back with the same name from the same machine
+ *     gets his seat again (HELLO is answered by WELCOME, START, PLAYERs,
+ *     STATE) and the question he was being asked is asked again. When the
+ *     game needs him while he is away it pauses, and everyone sees how long
+ *     is left (WAIT). If the time runs out he leaves the game.
+ *   - Answering. A joiner has the answer time to answer a question or to
+ *     finish his turn. Then his own game asks "Are you still there?" for
+ *     NET_WARN_SECS seconds; "I'm still here" sends ALIVE, which starts his
+ *     time again. The host gives up NET_WARN_SECS + NET_GRACE_SECS seconds
+ *     after the answer time, and he leaves the game (BYE tells him why).
+ *   - The host may remove a player he is waiting for at any time.
+ *   If the host leaves, the game is over for everyone: BYE says so; a
+ *   joiner who finds the host's game gone while reconnecting is told so.
+ *
  *   The host's engine asks each remote seat its questions through
  *   net_decider: the question goes out as ASK and the engine waits for the
  *   ANSWER, exactly as it waits for a dialog. Joiners hold no rules: they draw
@@ -63,7 +80,10 @@
  *   host -> joiner  WELCOME <joined> <name of host>  you are in the lobby
  *   host -> joiner  REFUSE <text>                    turned away (table full...)
  *   host -> all     LOBBY <text>                     who is waiting, for display
- *   host -> all     START <you> <nplayers>           the game begins; you are player <you>
+ *   host -> all     START <you> <nplayers> <reconnect> <answer>
+ *                                                    the game begins (or he is back);
+ *                                                    you are player <you>; the timers
+ *                                                    in seconds
  *   host -> all     PLAYER <p> <cpu> <diff> <name>|<from>   a player's name, kind and
  *                                                   machine (host name, or IP address)
  *   host -> all     STATE <numbers...>               the whole Game (net_encode_state)
@@ -73,7 +93,11 @@
  *   joiner -> host  ANSWER <id> <value>              the reply
  *   joiner -> host  ACTION <kind> <a> <b> <c>        on his turn (NetAction)
  *   host -> one     NOTE <title>|<text>              a message to show in a dialog
- *   either          BYE <text>                       leaving / the game is over */
+ *   either          BYE <text>                       leaving / the game is over
+ *   joiner -> host  ALIVE                            "I'm still here": his answer time
+ *                                                    starts again
+ *   host -> all     WAIT <p> <why> <secs>            waiting for player p (NW_*), secs
+ *                                                    left; why 0: no longer waiting */
 #ifndef NET_H
 #define NET_H
 
@@ -82,7 +106,7 @@
 #include "game.h"
 
 #define NET_PORT        1904    /* the year of the patent */
-#define NET_PROTOCOL    5
+#define NET_PROTOCOL    6
 #define NET_LINE_MAX    4096
 #define NET_MAX_FIELDS  320
 #define NET_MAX_REMOTE  (MAXPLAYERS - 1)    /* the host plus three joiners */
@@ -92,6 +116,7 @@ typedef enum { NET_NONE, NET_HOST, NET_CLIENT } NetRole;
 typedef enum {
     NM_HELLO, NM_WELCOME, NM_REFUSE, NM_LOBBY, NM_START, NM_PLAYER, NM_STATE,
     NM_LOG, NM_TURN, NM_ASK, NM_ANSWER, NM_ACTION, NM_NOTE, NM_BYE, NM_FROM,
+    NM_ALIVE, NM_WAIT,
     NM_COUNT, NM_BAD = -1
 } NetMsgKind;
 
@@ -162,12 +187,34 @@ void net_after_fork(void);
  * (netui.c sets it). It returns 1 if the player asked to stop waiting. */
 void net_set_idle(int (*idle)(void));
 
+/* The "Are you still there?" warning, and the host's margin after it. */
+#define NET_WARN_SECS   60
+#define NET_GRACE_SECS  10
+
+/* Why the game is waiting for a player (WAIT, and the host's wait hook). */
+enum { NW_NONE, NW_ANSWER, NW_RECONNECT };
+
 /* ---- hosting ---- */
 
 /* Listen on 127.0.0.1:port. 0, or -1 with a message in err. */
 int  net_host(int port, char *err, size_t errsize);
 /* The host's own name, shown to joiners in the lobby. */
 void net_set_host_name(const char *name);
+/* The timers of the hosted game, in seconds (see TIMERS above). */
+void net_set_timers(int reconnect_secs, int answer_secs);
+/* The host's allowance for the joiner's warning and its margin (normally
+ * NET_WARN_SECS and NET_GRACE_SECS; the tests shorten them). */
+void net_set_warning(int warn_secs, int grace_secs);
+/* Called about ten times a second while the host waits for player p
+ * (`why` NW_ANSWER or NW_RECONNECT, `secs` left before he is removed); it
+ * keeps the window alive. Returns 1 to remove him now, 2 if the host wants
+ * to end the game, else 0. netui.c sets it. */
+void net_set_wait_hook(int (*hook)(int p, int why, int secs));
+/* Seconds before away player p is given up, or 0 if he is not away. */
+int  net_seat_away(int p);
+/* Take player p out of the game now (a BYE with `why` if he is still
+ * connected); he leaves the game (game_player_leaves). */
+void net_remove_player(int p, const char *why);
 /* Accept and greet joiners, notice the ones who left; wait at most ms.
  * Before the game starts joiners wait in the lobby (four humans at most,
  * counting the host); afterwards newcomers are turned away. Returns 1 if the
@@ -266,6 +313,10 @@ int  net_join(const char *host, int port, const char *remote_cmd, const char *na
  * yet, -1 = the connection is closed. */
 int  net_client_recv(NetMsg *m, int ms);
 int  net_client_send(NetMsgKind kind, const int *num, int nnum, const char *text);
+/* When the joiner last sent the host anything, on net_clock_ms's clock (a
+ * millisecond clock that only goes forward). */
+long net_client_last_send(void);
+long net_clock_ms(void);
 
 /* ---- the relay (XLandlord --relay PORT, started by ssh) ---- */
 

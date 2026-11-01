@@ -124,6 +124,11 @@ extern XwMouse xw_mouse;
 
 /* Block until a key, click, resize or close (keys.h). */
 int  xw_next_key(void);
+/* While xw_next_key waits, call fn every `ms` milliseconds (network play
+ * keeps its connections and timers going under any dialog). If fn returns
+ * nonzero, xw_next_key returns K_RESIZE so the caller redraws. NULL: no
+ * idle function. fn is not called again while it runs. */
+void xw_set_idle(int (*fn)(void), int ms);
 /* The same, but give up after `ms` milliseconds with K_TIMEOUT. */
 int  xw_wait_key(int ms);
 /* Throw away pending keys and clicks (after a long computer turn). */

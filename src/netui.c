@@ -38,6 +38,7 @@
 /* ---- keeping the window alive ---- */
 
 static int in_idle;             /* (a dialog opened while idling must not idle again) */
+static UiRect wait_button;      /* netui_wait's Remove button */
 
 /* See netui.h: called while waiting on the network; Close asks whether to
  * leave. */
@@ -54,6 +55,62 @@ int netui_idle(void)
                              : "Leave the network game?", 0);
     in_idle = 0;
     return quit;
+}
+
+/* "1:42" */
+static void mmss(char *out, size_t size, int secs)
+{
+    secs = MAX(0, secs);
+    snprintf(out, size, "%d:%02d", secs / 60, secs % 60);
+}
+
+/* See netui.h: the host's panel while the game waits for player p. */
+int netui_wait(int p, int why, int secs)
+{
+    static int last_p = -1, last_why = -1, last_secs = -1;
+    int k = xw_wait_key(1);
+    const char *name = app.game.pl[p].name;
+    char left[16], text[500], btn[64];
+    mmss(left, sizeof left, secs);
+    if (why == NW_RECONNECT)
+        snprintf(text, sizeof text, "%s's connection has dropped. Waiting for him to come back: %s left, then he "
+                 "leaves the game and play goes on.", name, left);
+    else
+        snprintf(text, sizeof text, "%s's time to answer is up, and he is being asked whether he is still there. "
+                 "If he does not answer within %s he is taken out of the game so that play can go on.", name, left);
+    snprintf(btn, sizeof btn, "&Remove %s", name);
+    if (k != K_TIMEOUT || p != last_p || why != last_why || secs != last_secs) {
+        last_p = p; last_why = why; last_secs = secs;
+        int lh = xw_line_height(XF_UI);
+        char buf[800];
+        const char *lines[10];
+        int w = MIN(520, xw_width() - 40);
+        int nl = ui_wrap(XF_UI, text, w - 2 * UI_MARGIN, buf, sizeof buf, lines, 10);
+        UiRect c = ui_frame(why == NW_RECONNECT ? "Waiting for a Player to Reconnect" : "Waiting for an Answer",
+                            w, 2 * UI_MARGIN + lh + 12 + nl * lh + 18 + UI_BUTTON_H);
+        for (int i = 0; i < nl; i++)
+            xw_text(XF_UI, c.x, c.y + i * lh + xw_ascent(XF_UI), lines[i], (int)strlen(lines[i]), XC_INK);
+        int bw = MAX(UI_BUTTON_W, xw_text_width(XF_UI, btn, (int)strlen(btn)) + 28);
+        wait_button = (UiRect){ c.x + c.w - bw, c.y + c.h - UI_BUTTON_H, bw, UI_BUTTON_H };
+        ui_button(wait_button, btn, 0);
+        xw_flush();
+    }
+    int ask = 0;
+    if (k == K_MOUSE && xw_mouse.button == 1 && ui_hit(wait_button, xw_mouse.x, xw_mouse.y)) ask = 1;
+    if (k == 'r' || k == 'R') ask = 1;
+    if (ask) {
+        char q[300];
+        snprintf(q, sizeof q, "Take %s out of the game now? His cards go back into the pack and nobody takes "
+                 "his seat.", name);
+        last_secs = -1;
+        return ui_yes_no("Remove a Player", q, 0) ? 1 : 0;
+    }
+    if (k == K_CLOSE || k == 27) {
+        last_secs = -1;
+        return ui_yes_no("Leave the Game", "Players are connected to this game. End the network game for everyone?", 0)
+               ? 2 : 0;
+    }
+    return 0;
 }
 
 /* ---- hosting ---- */
@@ -164,23 +221,35 @@ int netui_host_setup(GameSettings *s)
     static const char *const cpus[] = { "Easy", "Medium", "Hard" };     /* DIFF_* */
     static const char *const lens[] = { "3", "5", "7", "10" };
     static const char *const rules[] = { "Standard", "Advanced" };
-    static const int len_val[] = { 3, 5, 7, 10 };
+    static const char *const mins[] = { "1 min", "2 min", "5 min" };
+    static const int len_val[] = { 3, 5, 7, 10 }, min_val[] = { 1, 2, 5 };
     UiRow rows[] = {
         { "Computer skill", cpus, 3 },
         { "Game ends at wages", lens, 4 },
         { "Rules", rules, 2 },
+        { "Wait for a dropped player", mins, 3 },
+        { "Time to answer", mins, 3 },
     };
-    int sel[3] = { CLAMP(app.prefs.cpu_skill, DIFF_EASY, DIFF_HARD), 1, app.prefs.advanced };
+    int sel[5] = { CLAMP(app.prefs.cpu_skill, DIFF_EASY, DIFF_HARD), 1, app.prefs.advanced, 1, 1 };
     for (int i = 0; i < 4; i++) if (len_val[i] == app.prefs.end_wages) sel[1] = i;
+    for (int i = 0; i < 3; i++) {
+        if (min_val[i] == app.prefs.net_reconnect) sel[3] = i;
+        if (min_val[i] == app.prefs.net_answer) sel[4] = i;
+    }
     if (!ui_form("Host a Network Game",
                  "You host the game and set it up for everyone; up to three others join from their machines "
                  "over ssh. One computer player, at the skill you choose here, takes a free seat when fewer than "
                  "four humans play. Once the game starts nobody new can join; a player may leave, and the "
-                 "computer player stays to the end.", rows, 3, sel, "&Open"))
+                 "computer player stays to the end. A player whose connection drops may come back within the "
+                 "waiting time; one who does not answer in time is asked if he is still there, then taken out "
+                 "of the game.", rows, 5, sel, "&Open"))
         return 0;
     app.prefs.cpu_skill = sel[0];
     app.prefs.end_wages = len_val[sel[1]];
     app.prefs.advanced = sel[2];
+    app.prefs.net_reconnect = min_val[sel[3]];
+    app.prefs.net_answer = min_val[sel[4]];
+    net_set_timers(60 * app.prefs.net_reconnect, 60 * app.prefs.net_answer);
     int port = app.prefs.net_port;
     if (!ui_number("Host a Network Game",
                    "The port this game listens on. Only this machine can reach it: players come in through ssh. "
@@ -204,12 +273,24 @@ int netui_host_setup(GameSettings *s)
 /* ---- joining ---- */
 
 static int client_started;      /* the host has sent START */
+static int rejoining;           /* coming back after a dropped connection: keep the record */
+static int client_reconnect = 120, client_answer = 120;     /* the host's timers (START), seconds */
+static int asking;              /* answering one of the host's questions */
+static long ask_since, turn_since;      /* when that question, or my turn, began */
+static char join_target[256];   /* what was joined ([user@]host), for reconnecting */
+static int join_port = NET_PORT;
 
-/* The host has started the game: a fresh board to draw. */
+/* The host has started the game (or taken me back): a fresh board to draw. */
 static void client_start(int me, int nplayers)
 {
     Game *g = &app.game;
+    /* Coming back: the record of events is kept; the STATE that follows
+     * brings the rest up to date. */
+    static char saved_log[LOG_LINES][LOG_LEN];
+    int saved_count = 0;
+    if (rejoining) { memcpy(saved_log, g->log, sizeof saved_log); saved_count = g->log_count; }
     memset(g, 0, sizeof *g);
+    if (rejoining) { memcpy(g->log, saved_log, sizeof saved_log); g->log_count = saved_count; }
     g->nplayers = CLAMP(nplayers, 2, MAXPLAYERS);
     for (int i = 0; i < NSPACES; i++) { g->owner[i] = NOBODY; g->house_owner[i] = NOBODY; }
     g->trust_a = g->trust_b = -1;
@@ -288,6 +369,8 @@ static void client_message(const NetMsg *m)
     switch (m->kind) {
     case NM_START:
         client_start(m->num[0], m->num[1]);
+        if (m->num[2] > 0) client_reconnect = m->num[2];
+        if (m->num[3] > 0) client_answer = m->num[3];
         break;
     case NM_PLAYER: {
         int p = m->num[0];
@@ -317,13 +400,28 @@ static void client_message(const NetMsg *m)
         break;
     case NM_TURN:
         app.human_turn = m->num[0] == app.me && !g->over;
-        if (app.human_turn) xw_bell();
+        if (app.human_turn) { xw_bell(); turn_since = net_clock_ms(); }
         break;
     case NM_ASK: {
         view_draw();
         xw_flush();
+        asking = 1;
+        ask_since = net_clock_ms();
         int ans[2] = { m->num[0], answer(m) };
+        asking = 0;
         net_client_send(NM_ANSWER, ans, 2, NULL);
+        break;
+    }
+    case NM_WAIT: {
+        int p = m->num[0], why = m->num[1], secs = m->num[2];
+        if (p < 0 || p >= g->nplayers) break;
+        if (why == NW_NONE) view_set_status("%s", "");
+        else if (!(p == app.me && why == NW_ANSWER)) {
+            char left[16];
+            mmss(left, sizeof left, secs);
+            view_set_status(why == NW_RECONNECT ? "Waiting for %s to reconnect (%s)..." : "Waiting for %s (%s)...",
+                            g->pl[p].name, left);
+        }
         break;
     }
     case NM_NOTE: {
@@ -342,16 +440,150 @@ static void client_message(const NetMsg *m)
     }
 }
 
+int netui_tick(void);
+
+/* The connection broke during a game: try to get back in, by ssh again,
+ * every few seconds until the host's reconnect time is up. The host keeps
+ * the seat for the same name from the same machine. 1 = back in. */
+static int reconnect(void)
+{
+    long start = net_clock_ms(), deadline = start + 1000L * client_reconnect, next_try = start;
+    char err[1200] = "";
+    int tries = 0;
+    for (;;) {
+        long now = net_clock_ms();
+        if (now >= deadline) {
+            client_lost("The connection to the host was lost and could not be made again in time, so the host "
+                        "will have taken you out of the game.");
+            return 0;
+        }
+        char left[16], text[1600];
+        mmss(left, sizeof left, (int)((deadline - now + 999) / 1000));
+        snprintf(text, sizeof text, "The connection to the host was lost. Trying to reconnect... (%s left; the host "
+                 "keeps your seat until then)%s%s", left, tries && err[0] ? "\n\nLast try: " : "", tries ? err : "");
+        int lh = xw_line_height(XF_UI);
+        char buf[2000];
+        const char *lines[16];
+        int w = MIN(560, xw_width() - 40);
+        int nl = ui_wrap(XF_UI, text, w - 2 * UI_MARGIN, buf, sizeof buf, lines, 16);
+        UiRect c = ui_frame("Connection Lost", w, 2 * UI_MARGIN + lh + 12 + nl * lh + 18 + UI_BUTTON_H);
+        for (int i = 0; i < nl; i++)
+            xw_text(XF_UI, c.x, c.y + i * lh + xw_ascent(XF_UI), lines[i], (int)strlen(lines[i]), XC_INK);
+        UiRect give = { c.x + c.w - UI_BUTTON_W - 20, c.y + c.h - UI_BUTTON_H, UI_BUTTON_W + 20, UI_BUTTON_H };
+        ui_button(give, "&Give Up", 1);
+        xw_flush();
+        if (now >= next_try) {
+            tries++;
+            next_try = now + 5000;
+            if (net_join(join_target, join_port, app.prefs.net_command, app.prefs.names[0], err, sizeof err) == 0) {
+                /* WELCOMEd: START, the PLAYERs and the STATE follow. */
+                rejoining = 1;
+                client_started = 0;
+                NetMsg m;
+                long until = net_clock_ms() + 15000;
+                while (!client_started && net_clock_ms() < until) {
+                    int r = net_client_recv(&m, 200);
+                    if (r < 0) break;
+                    if (r > 0) client_message(&m);
+                }
+                rejoining = 0;
+                if (client_started) {
+                    game_log(&app.game, "Reconnected to the host.");
+                    return 1;
+                }
+                net_close(NULL);
+            } else if (strstr(err, "no game is being hosted")) {
+                client_lost("The host's game is no longer running: the host has left, so the game is over.");
+                return 0;
+            } else if (strstr(err, "already being played")) {
+                client_lost("The host no longer keeps your seat: you have been taken out of the game.");
+                return 0;
+            }
+            continue;
+        }
+        int k = xw_wait_key(250);
+        if (k == 27 || k == K_CLOSE || k == 'g' || k == 'G' ||
+            (k == K_MOUSE && xw_mouse.button == 1 && ui_hit(give, xw_mouse.x, xw_mouse.y))) {
+            client_lost("You gave up reconnecting; the host will take you out of the game.");
+            return 0;
+        }
+    }
+}
+
 /* See netui.h: handle up to a few hundred messages that have arrived. */
 void netui_client_pump(int ms)
 {
     NetMsg m;
+    /* (On my turn the main loop, not a dialog, is waiting: check the timer here too.) */
+    if (netui_tick()) { view_draw(); xw_flush(); }
     for (int i = 0; i < 400 && net_role() == NET_CLIENT; i++) {
         int r = net_client_recv(&m, i ? 0 : ms);
-        if (r < 0) { client_lost("The connection to the host was lost."); return; }
+        if (r < 0) {
+            if (app.playing && !app.game.over && client_started) { if (reconnect()) continue; return; }
+            client_lost("The connection to the host was lost.");
+            return;
+        }
         if (r == 0) return;
         client_message(&m);
     }
+}
+
+/* "Are you still there?": the joiner has had the host's answer time to
+ * answer a question or finish his turn. NET_WARN_SECS to say so (ALIVE
+ * starts his time again); after that the host takes him out. */
+static void still_there(void)
+{
+    long deadline = net_clock_ms() + 1000L * NET_WARN_SECS;
+    xw_bell();
+    for (;;) {
+        long now = net_clock_ms();
+        if (now >= deadline) break;
+        char left[16], text[400];
+        mmss(left, sizeof left, (int)((deadline - now + 999) / 1000));
+        snprintf(text, sizeof text, "The other players are waiting for you. Are you still there?\n\nIf you do not "
+                 "answer within %s you will be taken out of the game so that play can go on.", left);
+        int lh = xw_line_height(XF_UI);
+        char buf[800];
+        const char *lines[10];
+        int w = MIN(500, xw_width() - 40);
+        int nl = ui_wrap(XF_UI, text, w - 2 * UI_MARGIN, buf, sizeof buf, lines, 10);
+        UiRect c = ui_frame("Are You Still There?", w, 2 * UI_MARGIN + lh + 12 + nl * lh + 18 + UI_BUTTON_H);
+        for (int i = 0; i < nl; i++)
+            xw_text(XF_UI, c.x, c.y + i * lh + xw_ascent(XF_UI), lines[i], (int)strlen(lines[i]), XC_INK);
+        int bw = UI_BUTTON_W + 60;
+        UiRect here = { c.x + c.w - bw, c.y + c.h - UI_BUTTON_H, bw, UI_BUTTON_H };
+        ui_button(here, "&I'm Still Here", 1);
+        xw_flush();
+        int k = xw_wait_key(250);
+        if (k == '\n' || k == '\r' || k == ' ' || k == 'i' || k == 'I' || k == 27 ||
+            (k == K_MOUSE && xw_mouse.button == 1 && ui_hit(here, xw_mouse.x, xw_mouse.y))) {
+            net_client_send(NM_ALIVE, NULL, 0, NULL);
+            return;
+        }
+    }
+    /* Too late: the host's BYE will say so (or the next message does). */
+    NetMsg m;
+    long until = net_clock_ms() + 1000L * (NET_GRACE_SECS + 5);
+    while (net_role() == NET_CLIENT && net_clock_ms() < until) {
+        int r = net_client_recv(&m, 250);
+        if (r < 0) { client_lost("You did not answer in time and have been taken out of the game."); return; }
+        if (r > 0) {
+            if (m.kind == NM_BYE) { client_lost(m.text[0] ? m.text : "You have been taken out of the game."); return; }
+            if (m.kind != NM_ASK) client_message(&m);
+        }
+    }
+}
+
+/* See netui.h: every quarter second while waiting for a key. */
+int netui_tick(void)
+{
+    if (net_role() == NET_HOST) return net_host_poll(0) != 0;
+    if (net_role() != NET_CLIENT || !client_started || app.game.over) return 0;
+    if (!asking && !app.human_turn) return 0;
+    long since = MAX(asking ? ask_since : turn_since, net_client_last_send());
+    if (net_clock_ms() - since < 1000L * client_answer) return 0;
+    still_there();
+    return 1;
 }
 
 /* The waiting room: until the host starts (1) or someone gives up (0). */
@@ -433,6 +665,8 @@ int netui_join(const char *given)
     copy_str(app.prefs.net_host, sizeof app.prefs.net_host, typed);
     prefs_save(&app.prefs);
     copy_str(host, sizeof host, target);    /* ssh gets user@host, as typed */
+    copy_str(join_target, sizeof join_target, target);
+    join_port = port;
 
     /* A note on screen while ssh connects (it can take a few seconds). */
     char msg[300];

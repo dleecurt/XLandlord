@@ -69,7 +69,7 @@ arrow keys) turn the pages.
 
 Without the 75dpi fonts the game still runs; X picks the nearest fonts it has.
 
-Current version: **0.0.10** (see `CHANGELOG.md`).
+Current version: **0.0.11** (see `CHANGELOG.md`).
 
 ## Playing
 
@@ -161,10 +161,23 @@ for an IPv6 address with a port, put the address in brackets:
   there is no computer player: a fourth human who joins before the start
   takes its seat.
 - Once the game has started nobody new may join, and the computer player
-  stays to the end. A human may leave (or his connection drop): he is out,
-  his cards go back into the pack and his houses come down, and nobody takes
-  his seat. With one player left the game is over. If the host leaves, the
-  game ends for everyone.
+  stays to the end. Starting money is set once, by the 1906 table, for the
+  players seated at the start.
+- **Quitting.** A human who quits is out: his cards go back into the pack,
+  his houses come down, his cash goes with him, and nobody takes his seat.
+  With one player left the game is over.
+- **A dropped connection.** His seat waits for him for the host's *Wait for a
+  dropped player* time (1, 2 or 5 minutes). His game reconnects by itself
+  every few seconds; the same name from the same machine gets the seat back
+  and is asked his question again. Play pauses whenever it needs him, with a
+  countdown on every screen. Not back in time: he leaves the game.
+- **Taking too long.** Each question, and each turn, has the host's *Time to
+  answer* (1, 2 or 5 minutes). Then the player's game asks "Are you still
+  there?" for one more minute; if he does not answer, he is taken out so
+  play can go on, and told why. The host may also remove a player he is
+  waiting for.
+- **The host.** If the host leaves, the game is over for everyone, and each
+  joiner is told so - also when the host's game simply stops.
 
 **How it works.** The joiner's program runs
 
@@ -269,7 +282,9 @@ with the seats as `seat1` .. `seat4` (`empty`, `human`, `computer`; one
 `medium`, `hard`; also used for hosted games) and the human names as
 `name1` .. `name4`; for network play
 `net_host` (the last host joined), `net_port` (the port to host on),
-`net_command` (the program ssh runs on the host, normally `XLandlord`).
+`net_command` (the program ssh runs on the host, normally `XLandlord`),
+`net_reconnect` and `net_answer` (the hosted game's timers, in minutes: 1,
+2 or 5).
 Older files are converted (a level per computer seat and `net_cpu` become
 one computer seat and `cpu_skill`); a 0.0.1 file is converted too,
 and a file from before the game was renamed XLandlord

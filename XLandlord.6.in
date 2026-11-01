@@ -311,11 +311,42 @@ humans there is none, and while the waiting room is open a fourth human
 who joins takes the computer player's seat.
 .PP
 Once the game starts the table is closed: nobody new may join, and the
-computer player stays to the end. A human may leave (or his connection
-drop): he is out of the game, his cards go back into the pack, his houses
-come down, his cash goes with him, and nobody takes his seat; his box shows
-that he has left. If only one player is left, the game is over. If the host
-leaves, the game ends for everyone.
+computer player stays to the end. Starting money is set once, by the 1906
+table, for the number of players seated when the host presses
+.BR "Start Game" ,
+and never changes afterward.
+.PP
+.B Leaving.
+A human who quits (Game > Quit) is out of the game at once: his cards go
+back into the pack, his houses come down, his cash goes with him, and
+nobody takes his seat; his box shows that he has left. If only one player
+is left, the game is over.
+.PP
+.B A dropped connection.
+If a joiner's connection breaks, his seat waits for him for the time the
+host chose
+.RB ( "Wait for a dropped player" :
+1, 2 or 5 minutes). His game tries to reconnect by itself every few
+seconds (he may also give up); the host lets back in the same name from
+the same machine, and the question he was being asked is asked again.
+Whenever the game needs him meanwhile, play pauses, and everyone sees how
+long is left. If he is not back in time, he leaves the game as above.
+.PP
+.B Taking too long.
+A joiner has the host's
+.B Time to answer
+(1, 2 or 5 minutes) for each question and for his turn. When it is up his
+game asks
+.I "Are you still there?"
+and gives him one more minute; answering starts his time again. If he
+does not answer, he is taken out of the game so that play can go on, and
+told why. While the host waits for a player who is away or taking too
+long, he can also remove him at once.
+.PP
+.B The host.
+Nobody else can take over a game, so if the host leaves, the game is over
+for everyone: each joiner is told, whether the host ended it or his game
+simply stopped.
 .\" ------------------------------------------------------------------
 .SH CONFIGURATION
 The game's settings are kept in
@@ -391,6 +422,21 @@ The last host joined, offered again by Join a Network Game.
 .B net_port
 The port to host on (default 1904).
 .TP
+.B net_reconnect
+In a hosted game, the minutes a dropped player has to come back:
+.BR 1 ,
+.B 2
+(the default) or
+.BR 5 .
+.TP
+.B net_answer
+In a hosted game, the minutes a joiner has to answer a question or finish
+his turn before he is asked whether he is still there:
+.BR 1 ,
+.B 2
+(the default) or
+.BR 5 .
+.TP
 .B net_command
 The program ssh runs on the host (default
 .BR XLandlord ).
@@ -428,7 +474,8 @@ A lot bought for $25 is thus worth $75 more than it cost before it collects
 a single rent.
 .SS Starting
 Every player starts on MOTHER EARTH with $600 if two play, $500 if three,
-$400 if four.
+$400 if four, counted once when the game starts (a player who leaves later
+does not change it).
 .SS The deal (Rule 1)
 The cards are shuffled and dealt round, one at a time, until 24 have been
 dealt or the pack is empty (there are 23 cards). Each player may buy any of

@@ -3,7 +3,7 @@
 *Lizzie J. Magie's game of 1904, by the rules of 1906, with the Single Tax,
 for one to four players at one screen or over the network.*
 
-XLandlord 0.0.10. Copyright (C) 2026 Lee Curtis. This document is
+XLandlord 0.0.11. Copyright (C) 2026 Lee Curtis. This document is
 part of the program and is free under the GNU General Public License,
 version 3 or later; the rules it describes are those of the public-domain 1904
 patent and 1906 rule book.
@@ -120,7 +120,9 @@ The **New Game** form:
   section 14).
 
 After **Start**, each human seat is asked for its player's name. Every player
-starts with money according to the number of players, as the 1906 rules say:
+starts with money according to the number of players, as the 1906 rules say.
+It is set once, when the game starts, and never changes afterward (in a
+network game, a player who leaves does not change it):
 
 | Players | Each starts with |
 | ------- | ---------------- |
@@ -541,11 +543,29 @@ a free seat, at the skill the host chose; four humans play without one (a
 fourth human who joins before the start takes its seat).
 
 **Leaving.** Once the game starts the table is closed: nobody new joins, and
-the computer player stays to the end. A human may leave (Game > Quit, or his
-connection drops). He is out of the game: his cards go back into the pack,
-his houses come down, his cash goes with him, and nobody takes his seat; his
-box says he has left. If only one player is left the game is over. If the
-host leaves, the game ends for everyone.
+the computer player stays to the end. A human who quits (Game > Quit) is out
+of the game: his cards go back into the pack, his houses come down, his cash
+goes with him, and nobody takes his seat; his box says he has left. If only
+one player is left the game is over.
+
+**A dropped connection.** When a joiner's connection breaks, his seat waits
+for him for the time the host chose (*Wait for a dropped player*: 1, 2 or 5
+minutes). His game tries to reconnect by itself every few seconds; the host
+lets back in the same name from the same machine, and he is asked again what
+he was being asked. Whenever the game needs him in the meantime, play pauses
+and every screen shows how long is left. If he is not back in time, he
+leaves the game as above.
+
+**Taking too long.** Each question, and each turn, has the host's *Time to
+answer* (1, 2 or 5 minutes); taking time to think is fine. When it is up the
+player's game asks *Are you still there?* and gives him one more minute;
+answering starts his time again. If he does not answer, he is taken out of
+the game so that play can go on, and told why. While the host waits for a
+player who is away or silent, he may also remove him at once.
+
+**The host.** Nobody else can take over a game, so if the host leaves, the
+game is over for everyone; each joiner is told, whether the host ended the
+game or his game simply stopped.
 
 **What you need.** The same version of the game on every machine, an ssh
 server on the host, and **password-less ssh** from each joiner to the host. On

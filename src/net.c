@@ -34,6 +34,7 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "net.h"
@@ -45,14 +46,16 @@
 static const char *const kind_names[NM_COUNT] = {
     "HELLO", "WELCOME", "REFUSE", "LOBBY", "START", "PLAYER", "STATE",
     "LOG", "TURN", "ASK", "ANSWER", "ACTION", "NOTE", "BYE", "FROM",
+    "ALIVE", "WAIT",
 };
 
 /* Numbers before the text; -1: the whole line is numbers. */
 static const int kind_fields[NM_COUNT] = {
     [NM_HELLO] = 1, [NM_WELCOME] = 1, [NM_REFUSE] = 0, [NM_LOBBY] = 0,
-    [NM_START] = 2, [NM_PLAYER] = 3, [NM_STATE] = -1, [NM_LOG] = 0,
+    [NM_START] = 4, [NM_PLAYER] = 3, [NM_STATE] = -1, [NM_LOG] = 0,
     [NM_TURN] = 1, [NM_ASK] = 5, [NM_ANSWER] = 2, [NM_ACTION] = 4,
     [NM_NOTE] = 0, [NM_BYE] = 0, [NM_FROM] = 0,
+    [NM_ALIVE] = 0, [NM_WAIT] = 3,
 };
 
 /* See net.h: the first word of a message line, and its count of numbers. */
@@ -268,14 +271,6 @@ static int take_line(LineBuf *b, char *out, size_t size)
     return 1;
 }
 
-/* Milliseconds on the wall clock. */
-static long now_ms(void)
-{
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return tv.tv_sec * 1000L + tv.tv_usec / 1000;
-}
-
 /* Wait until fd is readable or ms pass. 1 readable, 0 timeout. */
 static int wait_readable(int fd, int ms)
 {
@@ -324,6 +319,11 @@ static int lobby[NET_MAX_REMOTE], nlobby;       /* conn indices, in order of arr
 static int lobby_open;                          /* before the game starts */
 static int seat_conn[MAXPLAYERS];               /* conn of a remote seat, or -1 */
 static int seat_remote[MAXPLAYERS];     /* the seat belongs to a joiner (even after he left) */
+static long seat_away_until[MAXPLAYERS];        /* connection dropped: give up at this time (ms), else 0 */
+static char seat_name[MAXPLAYERS][NAME_LEN];    /* who may come back to the seat ... */
+static int reconnect_secs = 120, answer_secs = 120;    /* the timers (net_set_timers) */
+static int warn_secs = NET_WARN_SECS, grace_secs = NET_GRACE_SECS;
+static int (*wait_hook)(int p, int why, int secs);     /* netui's waiting panel */
 static Game *hgame;                     /* the hosted game, once started */
 static int sent_log;                    /* log lines already sent to the joiners */
 static int ask_id;                      /* number of the last ASK, to match its ANSWER */
@@ -334,6 +334,31 @@ static char host_name[NAME_LEN];        /* shown to joiners in the lobby */
 static int (*action_fn)(Game *, int, const NetMsg *);   /* main.c's host_action */
 static char events[8][200];
 static int nevents, events_read;
+
+/* Milliseconds on a clock that only goes forward. */
+static long now_ms(void)
+{
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return (long)t.tv_sec * 1000L + t.tv_nsec / 1000000L;
+}
+
+/* See net.h. */
+void net_set_timers(int rsecs, int asecs)
+{
+    reconnect_secs = CLAMP(rsecs, 1, 3600);
+    answer_secs = CLAMP(asecs, 1, 3600);
+}
+void net_set_warning(int wsecs, int gsecs) { warn_secs = MAX(0, wsecs); grace_secs = MAX(0, gsecs); }
+void net_set_wait_hook(int (*hook)(int p, int why, int secs)) { wait_hook = hook; }
+
+/* See net.h. */
+int net_seat_away(int p)
+{
+    if (role != NET_HOST || p < 0 || p >= MAXPLAYERS || !seat_away_until[p]) return 0;
+    long left = seat_away_until[p] - now_ms();
+    return left > 0 ? (int)((left + 999) / 1000) : 1;
+}
 
 /* See net.h: what the host does with a joiner's ACTION. */
 void net_set_action_handler(int (*fn)(Game *g, int p, const NetMsg *m)) { action_fn = fn; }
@@ -452,11 +477,12 @@ static void send_lobby(void)
     for (int i = 0; i < nlobby; i++) send_msg(conns[lobby[i]].in.fd, NM_LOBBY, NULL, 0, text);
 }
 
-/* A joiner has gone: out of the lobby, or out of the game. Once the game
- * has started nobody takes his place - not a computer player, not a
- * newcomer: he leaves the game (game_player_leaves) and play goes on
- * without him. */
-static void drop(int c)
+/* A joiner has gone: out of the lobby, or out of the game. `deliberate`:
+ * he said BYE (he quit), else his connection broke. Once the game has
+ * started nobody takes his place - not a computer player, not a newcomer.
+ * One who quit leaves the game at once (net_remove_player); one whose
+ * connection broke has reconnect_secs to come back before he does. */
+static void drop_conn(int c, int deliberate)
 {
     if (!conns[c].open) return;
     char name[NAME_LEN];
@@ -473,9 +499,33 @@ static void drop(int c)
     }
     if (p >= 0 && hgame && seat_conn[p] == c) {
         seat_conn[p] = -1;
-        event("%s has left the game.%s", name, "");
-        game_player_leaves(hgame, p);
+        if (deliberate || hgame->over) {
+            event("%s has left the game.%s", name, "");
+            net_remove_player(p, NULL);
+        } else {
+            seat_away_until[p] = now_ms() + 1000L * reconnect_secs;
+            event("%s's connection has dropped; waiting for him to come back.%s", name, "");
+            game_log(hgame, "%s's connection has dropped; he has %d:%02d to come back.", name,
+                     reconnect_secs / 60, reconnect_secs % 60);
+        }
     }
+}
+#define drop(c) drop_conn((c), 0)       /* the connection broke */
+#define quit(c) drop_conn((c), 1)       /* he said BYE */
+
+/* See net.h. */
+void net_remove_player(int p, const char *why)
+{
+    if (role != NET_HOST || !hgame || p < 0 || p >= hgame->nplayers || !seat_remote[p]) return;
+    int c = seat_conn[p];
+    if (c >= 0 && conns[c].open) {
+        send_msg(conns[c].in.fd, NM_BYE, NULL, 0, why ? why : "You have left the game.");
+        conns[c].player = -1;
+        close_conn(c);
+    }
+    seat_conn[p] = -1;
+    seat_away_until[p] = 0;
+    game_player_leaves(hgame, p);
 }
 
 /* Turn a newcomer away with a REFUSE carrying the reason. */
@@ -498,6 +548,46 @@ static int humans_seated(void)
 #define FULL_MESSAGE "The table is full: four players are already seated (the host and three others), " \
                      "and four is the limit. Try again when the next game is set up."
 
+/* Send seat p's player everything he needs to draw the game: START (with
+ * the timers), each PLAYER, the whole STATE. At the start of the game, and
+ * again when he comes back after a dropped connection. */
+static void send_game_to(int c, int p)
+{
+    int fd = conns[c].in.fd;
+    int st[4] = { p, hgame->nplayers, reconnect_secs, answer_secs };
+    send_msg(fd, NM_START, st, 4, NULL);
+    for (int q = 0; q < hgame->nplayers; q++) {
+        int pl[3] = { q, hgame->pl[q].cpu, hgame->pl[q].difficulty };
+        char text[700];
+        snprintf(text, sizeof text, "%s|%s", hgame->pl[q].name, player_from[q]);
+        send_msg(fd, NM_PLAYER, pl, 3, text);
+    }
+    static int num[NET_MAX_FIELDS];
+    int n = net_encode_state(hgame, num, NET_MAX_FIELDS);
+    if (n > 0) send_msg(fd, NM_STATE, num, n, NULL);
+}
+
+/* During a game: is newcomer c the player of an away seat coming back -
+ * the same name from the same machine? Gives him the seat and returns 1. */
+static int rejoin(int c)
+{
+    for (int p = 0; p < hgame->nplayers; p++) {
+        if (!seat_remote[p] || !seat_away_until[p] || hgame->pl[p].left) continue;
+        if (strcmp(seat_name[p], conns[c].name) || strcmp(player_from[p], conns[c].from)) continue;
+        conns[c].hello = 1;
+        conns[c].player = p;
+        seat_conn[p] = c;
+        seat_away_until[p] = 0;
+        int num[1] = { p + 1 };
+        send_msg(conns[c].in.fd, NM_WELCOME, num, 1, host_name);
+        send_game_to(c, p);
+        event("%s is back.%s", conns[c].name, "");
+        game_log(hgame, "%s is back at the table.", conns[c].name);
+        return 1;
+    }
+    return 0;
+}
+
 /* A new conn's first line: HELLO, then in, or turned away. */
 static void greet(int c, const char *line)
 {
@@ -510,6 +600,14 @@ static void greet(int c, const char *line)
     if (m.num[0] != NET_PROTOCOL) {
         event("%s was turned away: a different version of the game.%s", conns[c].name, "");
         refuse(c, "The host runs a different version of XLandlord; use the same version on every machine.");
+        return;
+    }
+    /* A game under way admits nobody new - only an away player coming back. */
+    if (hgame && !lobby_open) {
+        if (rejoin(c)) return;
+        event("%s was turned away: a game is in progress.%s", conns[c].name, "");
+        refuse(c, "A game is already being played on this host, and nobody new can join it once it has "
+                  "started. Ask the host to set up a new one, then join.");
         return;
     }
     if (humans_seated() >= MAXPLAYERS) {
@@ -555,7 +653,14 @@ static void service(int c)
         char line[NET_LINE_MAX];
         while (conns[c].open && !conns[c].hello && take_line(&conns[c].in, line, sizeof line))
             if (!first_line(c, line)) greet(c, line);
-        drop(c);
+        /* A seated player's last words: a BYE means he quit, not that his
+         * line went dead. */
+        int bye = 0;
+        while (conns[c].open && conns[c].hello && take_line(&conns[c].in, line, sizeof line)) {
+            NetMsg m;
+            if (net_parse(line, &m) == 0 && m.kind == NM_BYE) bye = 1;
+        }
+        if (bye) quit(c); else drop(c);
         return;
     }
     if (c == waiting_conn) return;
@@ -564,8 +669,8 @@ static void service(int c)
         if (first_line(c, line)) continue;
         if (!conns[c].hello) { greet(c, line); continue; }
         NetMsg m;
-        if (net_parse(line, &m) == 0 && m.kind == NM_BYE) { drop(c); return; }
-        /* Anything else outside a wait (a stray ACTION) is ignored. */
+        if (net_parse(line, &m) == 0 && m.kind == NM_BYE) { quit(c); return; }
+        /* Anything else outside a wait (a stray ACTION, an ALIVE) is ignored. */
     }
 }
 
@@ -620,11 +725,12 @@ void net_build_table(GameSettings *s, const char *hname, int cpu_difficulty)
     copy_str(s->names[s->nplayers], NAME_LEN, hname);
     own_label(player_from[0], sizeof player_from[0]);
     s->cpu[s->nplayers++] = 0;
-    for (int p = 0; p < MAXPLAYERS; p++) { seat_remote[p] = 0; seat_conn[p] = -1; }
+    for (int p = 0; p < MAXPLAYERS; p++) { seat_remote[p] = 0; seat_conn[p] = -1; seat_away_until[p] = 0; seat_name[p][0] = '\0'; }
     for (int i = 0; i < nlobby && s->nplayers < MAXPLAYERS; i++) {
         int p = s->nplayers++, c = lobby[i];
         copy_str(s->names[p], NAME_LEN, conns[c].name);
         copy_str(player_from[p], sizeof player_from[p], conns[c].from);
+        copy_str(seat_name[p], sizeof seat_name[p], conns[c].name);
         s->cpu[p] = 0;
         seat_remote[p] = 1;
         seat_conn[p] = c;
@@ -649,18 +755,8 @@ void net_start_game(Game *g)
     hgame = g;
     last_n = -1;
     sent_log = MAX(0, g->log_count - LOG_LINES);
-    for (int p = 0; p < g->nplayers; p++) {
-        if (!net_seat_connected(p)) continue;
-        int fd = conns[seat_conn[p]].in.fd;
-        int st[2] = { p, g->nplayers };
-        send_msg(fd, NM_START, st, 2, NULL);
-        for (int q = 0; q < g->nplayers; q++) {
-            int pl[3] = { q, g->pl[q].cpu, g->pl[q].difficulty };
-            char text[700];
-            snprintf(text, sizeof text, "%s|%s", g->pl[q].name, player_from[q]);
-            send_msg(fd, NM_PLAYER, pl, 3, text);
-        }
-    }
+    for (int p = 0; p < g->nplayers; p++)
+        if (net_seat_connected(p)) send_game_to(seat_conn[p], p);
     net_broadcast(g);
 }
 
@@ -709,50 +805,150 @@ void net_turn(int p)
     for (int q = 0; q < hgame->nplayers; q++) send_to(q, NM_TURN, num, 1, NULL);
 }
 
-/* Wait for a line from remote seat p's connection, keeping everything else
- * alive (other joiners, latecomers, the host's window). 1 = got a line,
- * -1 = the seat dropped or the host gave up waiting. */
-static int seat_line(int p, char *line, size_t size)
+/* WAIT to every joiner: the game is waiting for player p (why NW_*, secs
+ * left), or no longer (why NW_NONE). Sent when it starts, ends, and once a
+ * second in between. */
+static void send_wait(int p, int why, int secs)
 {
+    int num[3] = { p, why, secs };
+    for (int q = 0; q < MAXPLAYERS; q++) if (net_seat_connected(q)) send_to(q, NM_WAIT, num, 3, NULL);
+}
+
+/* One step of a wait for player p: keep the other connections and the
+ * host's window alive, show the countdown (once his answer time is up, or
+ * at once while he is away), and tell the joiners. Returns 0 to go on,
+ * 1 if the host removed him, 2 if the host is ending the game. */
+static int wait_step(int p, int why, long started, long deadline, int *shown)
+{
+    net_host_poll(0);
+    long now = now_ms();
+    int secs = (int)((deadline - now + 999) / 1000);
+    /* The countdown shows at once for a lost connection; for an answer,
+     * only once his answer time is up (taking time to think is allowed). */
+    if (why == NW_RECONNECT || now - started >= 1000L * answer_secs) {
+        if (*shown != secs) { send_wait(p, why, secs); *shown = secs; }
+        if (wait_hook) {
+            int r = wait_hook(p, why, MAX(0, secs));
+            if (r) return r;
+        } else if (idle()) return 2;
+    } else if (idle()) return 2;
+    return 0;
+}
+
+/* While seat p is away, wait for him to come back. 1 = he is back, 0 = he
+ * left (the time ran out, the host removed him, or the host is ending). */
+static int wait_back(int p)
+{
+    if (net_seat_connected(p)) return 1;
+    if (!seat_away_until[p] || hgame->pl[p].left) return 0;
+    long started = now_ms();
+    int shown = -1;
+    while (!net_seat_connected(p)) {
+        if (!seat_away_until[p] || hgame->pl[p].left) return 0;
+        if (now_ms() >= seat_away_until[p]) {
+            game_log(hgame, "%s did not come back in time.", hgame->pl[p].name);
+            net_remove_player(p, NULL);
+            send_wait(p, NW_NONE, 0);
+            return 0;
+        }
+        int r = wait_step(p, NW_RECONNECT, started, seat_away_until[p], &shown);
+        if (r == 1) { net_remove_player(p, NULL); send_wait(p, NW_NONE, 0); return 0; }
+        if (r == 2) { net_close("The host has ended the game."); return 0; }
+        usleep(20000);
+    }
+    send_wait(p, NW_NONE, 0);
+    return 1;
+}
+
+/* Player p said BYE in the middle of a wait: he has quit. */
+static void said_bye(int p)
+{
+    if (seat_conn[p] >= 0) quit(seat_conn[p]);
+    else net_remove_player(p, NULL);
+}
+
+/* The longest the host waits for an answer before removing the player:
+ * his answer time, the "Are you still there?" warning, and a margin. */
+static long answer_limit(void) { return 1000L * (answer_secs + warn_secs + grace_secs); }
+
+/* Wait for a line from remote seat p's connection, keeping everything else
+ * alive (other joiners, latecomers, the host's window). An ALIVE starts
+ * his answer time again (*since). 1 = got a line, 0 = his connection
+ * dropped (he may come back), -1 = he has left the game or the host is
+ * ending it. */
+static int seat_line(int p, char *line, size_t size, long *since)
+{
+    int shown = -1;
     for (;;) {
-        if (!net_seat_connected(p)) return -1;
+        if (!net_seat_connected(p)) return hgame && seat_away_until[p] && !hgame->pl[p].left ? 0 : -1;
         int c = seat_conn[p];
-        if (take_line(&conns[c].in, line, size)) return 1;
+        if (take_line(&conns[c].in, line, size)) {
+            NetMsg m;
+            if (net_parse(line, &m) == 0 && m.kind == NM_ALIVE) {
+                *since = now_ms();
+                if (shown >= 0) { send_wait(p, NW_NONE, 0); shown = -1; }
+                continue;
+            }
+            if (shown >= 0) send_wait(p, NW_NONE, 0);
+            *since = now_ms();
+            return 1;
+        }
         waiting_conn = c;
         int ready = wait_readable(conns[c].in.fd, 100);
         if (ready && fill(&conns[c].in) < 0) {
+            /* The connection has closed. His last line may be a BYE (he
+             * quit: out at once) or something else (then he is away). */
             int got = take_line(&conns[c].in, line, size);
             waiting_conn = -1;
-            if (got) { drop(c); return 1; }
+            NetMsg m;
+            if (got && net_parse(line, &m) == 0 && m.kind == NM_BYE) { quit(c); return -1; }
             drop(c);
-            return -1;
+            if (got) return 1;
+            continue;                   /* (away now: reported above) */
         }
-        net_host_poll(0);
         waiting_conn = -1;
-        if (idle()) {                   /* the host is leaving */
-            net_close("The host has ended the game.");
+        long limit = *since + answer_limit();
+        if (now_ms() >= limit) {
+            game_log(hgame, "%s did not answer in time.", hgame->pl[p].name);
+            net_remove_player(p, "You did not answer in time, so you have been taken out of the game "
+                                 "and play has gone on without you.");
+            send_wait(p, NW_NONE, 0);
             return -1;
         }
+        int r = wait_step(p, NW_ANSWER, *since, limit, &shown);
+        if (r == 1) {
+            net_remove_player(p, "The host has taken you out of the game.");
+            send_wait(p, NW_NONE, 0);
+            return -1;
+        }
+        if (r == 2) { net_close("The host has ended the game."); return -1; }
     }
 }
 
 /* See net.h: send ASK and wait for the matching ANSWER, keeping the host's
- * window and the other connections alive. */
+ * window and the other connections alive. If his connection drops he has
+ * his reconnect time to come back, and is asked again. */
 int net_ask(int p, NetAsk kind, int a, int b, int c, const char *text)
 {
-    if (role != NET_HOST || !net_seat_connected(p)) return -1;
-    net_broadcast(hgame);
-    int id = ++ask_id;
-    int num[5] = { id, kind, a, b, c };
-    send_to(p, NM_ASK, num, 5, text ? text : "");
-    char line[NET_LINE_MAX];
-    while (seat_line(p, line, sizeof line) > 0) {
-        NetMsg m;
-        if (net_parse(line, &m) < 0) continue;
-        if (m.kind == NM_ANSWER && m.num[0] == id) return m.num[1];
-        if (m.kind == NM_BYE) { drop(seat_conn[p]); break; }
+    if (role != NET_HOST || !hgame || !net_seat_remote(p) || hgame->pl[p].left) return -1;
+    for (;;) {
+        if (!wait_back(p)) return -1;
+        net_broadcast(hgame);
+        int id = ++ask_id;
+        int num[5] = { id, kind, a, b, c };
+        send_to(p, NM_ASK, num, 5, text ? text : "");
+        char line[NET_LINE_MAX];
+        long since = now_ms();
+        int r;
+        while ((r = seat_line(p, line, sizeof line, &since)) > 0) {
+            NetMsg m;
+            if (net_parse(line, &m) < 0) continue;
+            if (m.kind == NM_ANSWER && m.num[0] == id) return m.num[1];
+            if (m.kind == NM_BYE) { said_bye(p); return -1; }
+        }
+        if (r < 0) return -1;
+        /* r == 0: his connection dropped; wait for him, then ask again. */
     }
-    return -1;
 }
 
 /* See net.h: BYE to everyone, close; joiners still seated leave the game. */
@@ -769,7 +965,7 @@ void net_close(const char *why)
         if (hgame)
             for (int p = 0; p < hgame->nplayers; p++)
                 if (seat_remote[p]) game_player_leaves(hgame, p);
-        for (int p = 0; p < MAXPLAYERS; p++) seat_conn[p] = -1;
+        for (int p = 0; p < MAXPLAYERS; p++) { seat_conn[p] = -1; seat_away_until[p] = 0; }
         nlobby = 0;
         lobby_open = 0;
     } else if (role == NET_CLIENT) {
@@ -871,22 +1067,27 @@ static int nd_raise(Game *g, int p, int need)
 /* The joiner's own business on his turn: ACTIONs until he throws. */
 static void nd_pre_roll(Game *g, int p)
 {
-    if (!net_seat_connected(p)) { ai_decider.pre_roll(g, p); return; }
-    net_broadcast(g);
-    net_turn(p);
-    char line[NET_LINE_MAX];
-    while (seat_line(p, line, sizeof line) > 0) {
-        NetMsg m;
-        if (net_parse(line, &m) < 0) continue;
-        if (m.kind == NM_BYE) { drop(seat_conn[p]); break; }
-        if (m.kind != NM_ACTION) continue;
-        if (m.num[0] == NX_ROLL) return;
-        if (action_fn && action_fn(g, p, &m)) return;
-        if (!action_fn) net_note(p, "Not Available", "The host cannot do that.");
+    for (;;) {
+        if (g->pl[p].left || !wait_back(p)) return;    /* (game_turn ends the turn of one who left) */
         net_broadcast(g);
         net_turn(p);
+        char line[NET_LINE_MAX];
+        long since = now_ms();
+        int r;
+        while ((r = seat_line(p, line, sizeof line, &since)) > 0) {
+            NetMsg m;
+            if (net_parse(line, &m) < 0) continue;
+            if (m.kind == NM_BYE) { said_bye(p); return; }
+            if (m.kind != NM_ACTION) continue;
+            if (m.num[0] == NX_ROLL) return;
+            if (action_fn && action_fn(g, p, &m)) return;
+            if (!action_fn) net_note(p, "Not Available", "The host cannot do that.");
+            net_broadcast(g);
+            net_turn(p);
+        }
+        if (r < 0) return;
+        /* r == 0: his connection dropped mid-turn; wait for him, then his turn goes on. */
     }
-    /* (If the joiner left during his turn, game_turn ends it.) */
 }
 
 const Decider net_decider = {
@@ -1178,12 +1379,19 @@ int net_client_recv(NetMsg *m, int ms)
     }
 }
 
+static long client_sent_at;     /* when the joiner last sent anything (net_client_last_send) */
+
 /* See net.h: one message to the host. */
 int net_client_send(NetMsgKind kind, const int *num, int nnum, const char *text)
 {
     if (role != NET_CLIENT || cin.fd < 0) return -1;
+    client_sent_at = now_ms();
     return send_msg(cin.fd, kind, num, nnum, text);
 }
+
+/* See net.h. */
+long net_client_last_send(void) { return client_sent_at; }
+long net_clock_ms(void) { return now_ms(); }
 
 /* ==== the relay ==== */
 

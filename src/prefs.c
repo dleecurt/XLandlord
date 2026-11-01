@@ -74,6 +74,8 @@ void prefs_defaults(Prefs *p)
     p->net_host[0] = '\0';
     p->net_port = 1904;
     copy_str(p->net_command, sizeof p->net_command, "XLandlord");
+    p->net_reconnect = 2;
+    p->net_answer = 2;
     p->cpu_skill = DIFF_MEDIUM;
 }
 
@@ -183,6 +185,8 @@ void prefs_load(Prefs *p)
         else if (!strcmp(key, "net_host")) copy_str(p->net_host, sizeof p->net_host, val);
         else if (!strcmp(key, "net_port") && n > 0 && n < 65536) p->net_port = n;
         else if (!strcmp(key, "net_command") && *val) copy_str(p->net_command, sizeof p->net_command, val);
+        else if (!strcmp(key, "net_reconnect")) p->net_reconnect = n == 1 || n == 5 ? n : 2;
+        else if (!strcmp(key, "net_answer")) p->net_answer = n == 1 || n == 5 ? n : 2;
         else if (!strcmp(key, "net_cpu")) {     /* 0.0.3 - 0.0.9: used if no seat gave a level */
             int d = skill_from_word(val);
             if (d >= 0 && !skill_given && !seat_skill) p->cpu_skill = d;
@@ -231,6 +235,9 @@ int prefs_save(const Prefs *p)
     fprintf(f, "net_host = %s\n", p->net_host);
     fprintf(f, "net_port = %d\n", p->net_port);
     fprintf(f, "net_command = %s\n", p->net_command);
+    fprintf(f, "# hosted games: minutes to wait for a dropped player, and to answer (1, 2 or 5)\n");
+    fprintf(f, "net_reconnect = %d\n", p->net_reconnect);
+    fprintf(f, "net_answer = %d\n", p->net_answer);
     return fclose(f) == 0;
 }
 

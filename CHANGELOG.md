@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.0.11 - 2026-11-01
+
+- A dropped connection is no longer the end: the joiner's seat waits for
+  him for the host's "Wait for a dropped player" time (1, 2 or 5 minutes,
+  default 2). His game reconnects by itself every few seconds (with a
+  countdown and Give Up); the host lets back in the same name from the same
+  machine and asks again the question that was cut off. Play pauses when it
+  needs him, with a countdown on every screen. Not back in time: he leaves
+  the game. A deliberate quit (BYE) still leaves at once.
+- Taking too long: each question and each turn has the host's "Time to
+  answer" (1, 2 or 5 minutes, default 2). Then the joiner's game asks "Are
+  you still there?" with a one-minute countdown; "I'm Still Here" starts
+  his time again. If he does not answer he is taken out so play can go on,
+  and told why. While waiting, the host sees a panel with the time left and
+  a Remove button.
+- The host leaving ends the game for everyone, and every joiner is told -
+  also when the host's game stops without a goodbye (found while
+  reconnecting).
+- Starting money is documented as set once at the start (1906 table).
+- Timers work under any open dialog (an idle function in the X event
+  wait). New preferences `net_reconnect` and `net_answer`.
+- Network protocol 6 (START carries the timers; ALIVE and WAIT are new):
+  0.0.11 cannot play with 0.0.10.
+- tests/net: a joiner who drops and comes back keeps his seat; one who does
+  not come back leaves; one who stops answering is taken out and told.
+
 ## 0.0.10 - 2026-10-31
 
 - One computer player at most, at any table. Its skill (Easy, Medium or

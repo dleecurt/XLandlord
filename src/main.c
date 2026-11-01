@@ -154,8 +154,9 @@ static int humans_in_game(const Game *g)
 
 int app_local_humans(void) { return app.playing ? humans_in_game(&app.game) : 1; }
 
-/* Is player p played at another machine (a joiner still connected)? */
-static int remote_seat(int p) { return net_role() == NET_HOST && net_seat_connected(p); }
+/* Is player p played at another machine (a joiner, connected or away and
+ * possibly coming back; not one who has left)? */
+static int remote_seat(int p) { return net_role() == NET_HOST && net_seat_remote(p) && !app.game.pl[p].left; }
 
 /* A message for player p, wherever he sits. */
 static void notify(int p, const char *title, const char *text)
@@ -963,6 +964,8 @@ int main(int argc, char **argv)
     update_status();
     view_draw();
     xw_flush();
+    net_set_wait_hook(netui_wait);
+    xw_set_idle(netui_tick, 250);       /* timers and connections under any dialog */
     start_up(mode, join_host);          /* host, join, or play here? */
 
     net_set_idle(netui_idle);
@@ -994,7 +997,7 @@ int main(int argc, char **argv)
         /* The host: keep the joiners' boards up to date (only changes are sent). */
         if (net_role() == NET_HOST && app.playing) net_broadcast(g);
         /* The host: a joiner's turn is played through net_decider. */
-        if (app.playing && !g->over && remote_seat(g->cur)) {
+        if (app.playing && !g->over && (remote_seat(g->cur) || g->pl[g->cur].left)) {
             app.human_turn = 0;
             update_status();
             view_draw();

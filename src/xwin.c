@@ -615,13 +615,40 @@ static int handle(XEvent *ev)
 }
 
 /* See xwin.h. */
+static int (*idle_fn)(void);    /* xw_set_idle */
+static int idle_every = 250, in_idle_fn;
+
+/* See xwin.h. */
+void xw_set_idle(int (*fn)(void), int ms) { idle_fn = fn; idle_every = MAX(20, ms); }
+
 int xw_next_key(void)
 {
     for (;;) {
-        XEvent ev;
-        XNextEvent(dpy, &ev);
-        int k = handle(&ev);
-        if (k != ERR) return k;
+        if (!idle_fn || in_idle_fn) {
+            XEvent ev;
+            XNextEvent(dpy, &ev);
+            int k = handle(&ev);
+            if (k != ERR) return k;
+            continue;
+        }
+        /* With an idle function: wait for X at most idle_every ms, then
+         * call it; if it changed something, have the caller redraw. */
+        while (XPending(dpy)) {
+            XEvent ev;
+            XNextEvent(dpy, &ev);
+            int k = handle(&ev);
+            if (k != ERR) return k;
+        }
+        int fd = ConnectionNumber(dpy);
+        fd_set set;
+        FD_ZERO(&set);
+        FD_SET(fd, &set);
+        struct timeval tv = { idle_every / 1000, (idle_every % 1000) * 1000 };
+        if (select(fd + 1, &set, NULL, NULL, &tv) > 0) continue;
+        in_idle_fn = 1;
+        int changed = idle_fn();
+        in_idle_fn = 0;
+        if (changed) return K_RESIZE;
     }
 }
 

@@ -29,6 +29,12 @@
 /* Keep the window alive while the program waits on the network. Returns 1
  * if the player closed the window (and agreed to leave the game). */
 int  netui_idle(void);
+/* The host's panel while the game waits for a player (net_set_wait_hook). */
+int  netui_wait(int p, int why, int secs);
+/* The idle function under every dialog (xw_set_idle): the host polls its
+ * connections; a joiner who has kept everyone waiting too long is asked
+ * whether he is still there. Returns 1 if the screen needs redrawing. */
+int  netui_tick(void);
 
 /* Host: the setup form, then the lobby until the host starts or cancels.
  * Returns 1 with the table in *s (net_build_table) when the game should
