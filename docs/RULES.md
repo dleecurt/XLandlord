@@ -3,7 +3,7 @@
 *Lizzie J. Magie's game of 1904, by the rules of 1906, with the Single Tax,
 for one to four players at one screen or over the network.*
 
-Viola the Landlord 0.0.5. Copyright (C) 2026 Lee Curtis. This document is
+Viola the Landlord 0.0.6. Copyright (C) 2026 Lee Curtis. This document is
 part of the program and is free under the GNU General Public License,
 version 3 or later; the rules it describes are those of the public-domain 1904
 patent and 1906 rule book.
@@ -483,6 +483,15 @@ waiting room shows who has joined; press **Start Game** when everyone is in.
 
 The waiting room also shows how to reach the host: its name and its IP
 addresses.
+
+**Who is where.** Next to each player's name the game shows the machine he
+plays from: the host's own host name, and for each joiner the name of the
+machine his ssh connection came from. The host finds that name the same way
+it finds every name, in its hosts file and in DNS; a machine it has no name
+for is shown by its IP address (*Bea (from 203.0.113.45)*). The same labels
+appear in the joiners' waiting room and, once the game starts, in the player
+boxes: *Lee (host, gamebox)*, *Ann (you, annbox)*, *Bea (network,
+203.0.113.45)*. A long name is shortened with "..." to fit.
 
 **To join:** Join a Network Game (at start-up, or in the Game menu), and type
 the host's address. You see the same board and the same dialogs, and on your

@@ -44,7 +44,7 @@
 
 static const char *const kind_names[NM_COUNT] = {
     "HELLO", "WELCOME", "REFUSE", "LOBBY", "START", "PLAYER", "STATE",
-    "LOG", "TURN", "ASK", "ANSWER", "ACTION", "NOTE", "BYE",
+    "LOG", "TURN", "ASK", "ANSWER", "ACTION", "NOTE", "BYE", "FROM",
 };
 
 /* Numbers before the text; -1: the whole line is numbers. */
@@ -52,7 +52,7 @@ static const int kind_fields[NM_COUNT] = {
     [NM_HELLO] = 1, [NM_WELCOME] = 1, [NM_REFUSE] = 0, [NM_LOBBY] = 0,
     [NM_START] = 2, [NM_PLAYER] = 3, [NM_STATE] = -1, [NM_LOG] = 0,
     [NM_TURN] = 1, [NM_ASK] = 5, [NM_ANSWER] = 2, [NM_ACTION] = 4,
-    [NM_NOTE] = 0, [NM_BYE] = 0,
+    [NM_NOTE] = 0, [NM_BYE] = 0, [NM_FROM] = 0,
 };
 
 /* See net.h: the first word of a message line, and its count of numbers. */
@@ -312,6 +312,8 @@ typedef struct {
     int hello;                  /* sent HELLO and was let in */
     int player;                 /* seat in the game, or -1 */
     char name[NAME_LEN];
+    int lines;                  /* lines read so far (FROM counts only as the first) */
+    char from[128];             /* his machine: host name, or IP address */
 } Conn;
 
 static int listen_fd = -1;              /* the localhost listener */
@@ -352,6 +354,48 @@ const char *net_host_event(void)
 
 int net_lobby_count(void) { return nlobby; }
 const char *net_lobby_name(int i) { return i >= 0 && i < nlobby ? conns[lobby[i]].name : ""; }
+
+/* See net.h. */
+const char *net_lobby_from(int i) { return i >= 0 && i < nlobby ? conns[lobby[i]].from : ""; }
+
+/* Each player's machine, as shown next to his name (net_player_from). */
+static char player_from[MAXPLAYERS][128];
+
+/* See net.h. */
+const char *net_player_from(int p)
+{
+    return role != NET_NONE && p >= 0 && p < MAXPLAYERS ? player_from[p] : "";
+}
+
+/* See net.h. */
+void net_set_player_from(int p, const char *from)
+{
+    if (p >= 0 && p < MAXPLAYERS) copy_str(player_from[p], sizeof player_from[p], from ? from : "");
+}
+
+/* See net.h: a reverse lookup that insists on a name (NI_NAMEREQD), else
+ * the address as given. */
+void net_host_label(const char *ip, char *out, size_t size)
+{
+    struct addrinfo hints, *res = NULL;
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_flags = AI_NUMERICHOST;
+    copy_str(out, size, ip && *ip ? ip : "unknown");
+    if (!ip || !*ip || getaddrinfo(ip, NULL, &hints, &res) != 0) return;
+    char name[NI_MAXHOST];
+    if (getnameinfo(res->ai_addr, res->ai_addrlen, name, sizeof name, NULL, 0, NI_NAMEREQD) == 0 && name[0])
+        copy_str(out, size, name);
+    freeaddrinfo(res);
+}
+
+/* This machine's name, for the host's own seat. */
+static void own_label(char *out, size_t size)
+{
+    char h[256] = "";
+    if (gethostname(h, sizeof h - 1) != 0 || !h[0]) copy_str(h, sizeof h, "this machine");
+    copy_str(out, size, h);
+}
 int net_seat_remote(int p) { return role == NET_HOST && p >= 0 && p < MAXPLAYERS && seat_remote[p]; }
 int net_seat_connected(int p) { return net_seat_remote(p) && seat_conn[p] >= 0 && conns[seat_conn[p]].open; }
 
@@ -398,10 +442,11 @@ static void close_conn(int c)
 /* Tell everyone waiting who is at the table. */
 static void send_lobby(void)
 {
-    char text[400];
-    int n = snprintf(text, sizeof text, "%s (host)", host_name[0] ? host_name : "Host");
+    char text[1200], here[128];
+    own_label(here, sizeof here);
+    int n = snprintf(text, sizeof text, "%s (host, %s)", host_name[0] ? host_name : "Host", here);
     for (int i = 0; i < nlobby && n < (int)sizeof text; i++)
-        n += snprintf(text + n, sizeof text - (size_t)n, ", %s", conns[lobby[i]].name);
+        n += snprintf(text + n, sizeof text - (size_t)n, ", %s (from %s)", conns[lobby[i]].name, conns[lobby[i]].from);
     for (int i = 0; i < nlobby; i++) send_msg(conns[lobby[i]].in.fd, NM_LOBBY, NULL, 0, text);
 }
 
@@ -457,6 +502,9 @@ static void greet(int c, const char *line)
     NetMsg m;
     if (net_parse(line, &m) < 0 || m.kind != NM_HELLO) { refuse(c, "That is not Viola the Landlord speaking."); return; }
     copy_str(conns[c].name, sizeof conns[c].name, m.text[0] ? m.text : "Player");
+    for (char *q = conns[c].name; *q; q++) if (*q == '|') *q = '/';    /* '|' separates fields in PLAYER */
+    /* No FROM line (a relay that is not ours): say so rather than guess. */
+    if (!conns[c].from[0]) copy_str(conns[c].from, sizeof conns[c].from, "an unknown machine");
     if (m.num[0] != NET_PROTOCOL) {
         event("%s was turned away: a different version of the game.%s", conns[c].name, "");
         refuse(c, "The host runs a different version of Viola the Landlord; use the same version on every machine.");
@@ -477,8 +525,22 @@ static void greet(int c, const char *line)
     lobby[nlobby++] = c;
     int num[1] = { nlobby };
     send_msg(conns[c].in.fd, NM_WELCOME, num, 1, host_name);
-    event("%s has joined.%s", conns[c].name, "");
+    event("%s has joined from %s.", conns[c].name, conns[c].from);
     send_lobby();
+}
+
+/* The relay's FROM line, which can only be the very first line of a
+ * connection (a joiner cannot forge it: the relay writes it before copying
+ * anything the joiner sends). Records where he comes from; returns 1 if the
+ * line was that. */
+static int first_line(int c, const char *line)
+{
+    if (conns[c].lines++ != 0) return 0;
+    NetMsg m;
+    if (net_parse(line, &m) < 0 || m.kind != NM_FROM) return 0;
+    if (m.text[0]) net_host_label(m.text, conns[c].from, sizeof conns[c].from);
+    else copy_str(conns[c].from, sizeof conns[c].from, "an unknown machine");    /* (not started by sshd) */
+    return 1;
 }
 
 /* Read from conn c and act on the lines that are for the host's poll: a
@@ -489,13 +551,15 @@ static void service(int c)
     if (fill(&conns[c].in) < 0) {
         /* Let a newcomer's last words (a HELLO) be read first. */
         char line[NET_LINE_MAX];
-        if (!conns[c].hello && take_line(&conns[c].in, line, sizeof line)) greet(c, line);
+        while (conns[c].open && !conns[c].hello && take_line(&conns[c].in, line, sizeof line))
+            if (!first_line(c, line)) greet(c, line);
         drop(c);
         return;
     }
     if (c == waiting_conn) return;
     char line[NET_LINE_MAX];
     while (conns[c].open && take_line(&conns[c].in, line, sizeof line)) {
+        if (first_line(c, line)) continue;
         if (!conns[c].hello) { greet(c, line); continue; }
         NetMsg m;
         if (net_parse(line, &m) == 0 && m.kind == NM_BYE) { drop(c); return; }
@@ -549,13 +613,16 @@ static const char *const cpu_name = "Lord Blueblood";
 void net_build_table(GameSettings *s, const char *hname, int cpu_difficulty)
 {
     copy_str(host_name, sizeof host_name, hname);
+    for (int p = 0; p < MAXPLAYERS; p++) player_from[p][0] = '\0';
     s->nplayers = 0;
     copy_str(s->names[s->nplayers], NAME_LEN, hname);
+    own_label(player_from[0], sizeof player_from[0]);
     s->cpu[s->nplayers++] = 0;
     for (int p = 0; p < MAXPLAYERS; p++) { seat_remote[p] = 0; seat_conn[p] = -1; }
     for (int i = 0; i < nlobby && s->nplayers < MAXPLAYERS; i++) {
         int p = s->nplayers++, c = lobby[i];
         copy_str(s->names[p], NAME_LEN, conns[c].name);
+        copy_str(player_from[p], sizeof player_from[p], conns[c].from);
         s->cpu[p] = 0;
         seat_remote[p] = 1;
         seat_conn[p] = c;
@@ -587,7 +654,9 @@ void net_start_game(Game *g)
         send_msg(fd, NM_START, st, 2, NULL);
         for (int q = 0; q < g->nplayers; q++) {
             int pl[3] = { q, g->pl[q].cpu, g->pl[q].difficulty };
-            send_msg(fd, NM_PLAYER, pl, 3, g->pl[q].name);
+            char text[700];
+            snprintf(text, sizeof text, "%s|%s", g->pl[q].name, player_from[q]);
+            send_msg(fd, NM_PLAYER, pl, 3, text);
         }
     }
     net_broadcast(g);
@@ -1130,6 +1199,15 @@ int net_relay(int port)
         fprintf(stderr, "no game is being hosted on this machine (nothing is listening on port %d). "
                         "Ask the host to choose Game > Host a Network Game first.\n", port);
         return 1;
+    }
+    /* First, where the joiner's ssh came from: sshd puts "client-address
+     * client-port server-address server-port" in SSH_CONNECTION. */
+    {
+        char ip[128] = "", line[200];
+        const char *sc = getenv("SSH_CONNECTION");
+        if (sc) sscanf(sc, "%127s", ip);
+        snprintf(line, sizeof line, "FROM %s\n", ip[0] ? ip : "");
+        if (write(fd, line, strlen(line)) < 0) { close(fd); return 1; }
     }
     char buf[8192];
     int in_open = 1;

@@ -65,8 +65,8 @@ A release tarball (`viola-landlord-X.Y.Z.tar.gz`) already contains the
 `configure` script, so you only need the build tools from section 1.
 
 ```
-tar xzf viola-landlord-0.0.5.tar.gz
-cd viola-landlord-0.0.5
+tar xzf viola-landlord-0.0.6.tar.gz
+cd viola-landlord-0.0.6
 ./configure
 make
 make check            # optional, about 10 seconds, needs no display
@@ -82,7 +82,7 @@ viola-landlord
 `configure` ends with a summary, for example:
 
 ```
-  Viola the Landlord 0.0.5 is configured:
+  Viola the Landlord 0.0.6 is configured:
     compiler:        gcc
     X11:             -lX11
     install prefix:  /usr/local

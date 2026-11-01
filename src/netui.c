@@ -85,8 +85,9 @@ static void this_address(char *out, size_t size)
 /* The lobby: who has joined, until Start or Cancel. */
 static int lobby(void)
 {
-    char addr[800], last_event[200] = "";
+    char addr[800], last_event[200] = "", here[256] = "this machine";
     this_address(addr, sizeof addr);
+    gethostname(here, sizeof here - 1);
     for (;;) {
         net_host_poll(0);
         for (const char *e; (e = net_host_event()); ) copy_str(last_event, sizeof last_event, e);
@@ -114,9 +115,10 @@ static int lobby(void)
         xw_fill(list.x, list.y, list.w, list.h, XC_SURFACE);
         xw_sunken(list.x, list.y, list.w, list.h);
         for (int i = 0; i < MAXPLAYERS; i++) {
-            char row[160];
-            if (i == 0) snprintf(row, sizeof row, "1.  %s  (host, this screen)", app.prefs.names[0]);
-            else if (i <= joined) snprintf(row, sizeof row, "%d.  %s  (joined through ssh)", i + 1, net_lobby_name(i - 1));
+            char row[400];
+            if (i == 0) snprintf(row, sizeof row, "1.  %s  (host, this screen: %s)", app.prefs.names[0], here);
+            else if (i <= joined) snprintf(row, sizeof row, "%d.  %s  (from %s)", i + 1, net_lobby_name(i - 1),
+                                           net_lobby_from(i - 1));
             else if (i == joined + 1) snprintf(row, sizeof row, "%d.  a computer player (%s), unless someone joins", i + 1,
                                                app.prefs.net_cpu == SEAT_EASY ? "easy" : app.prefs.net_cpu == SEAT_HARD ? "hard" : "medium");
             else snprintf(row, sizeof row, "%d.  (open)", i + 1);
@@ -288,7 +290,13 @@ static void client_message(const NetMsg *m)
     case NM_PLAYER: {
         int p = m->num[0];
         if (p < 0 || p >= MAXPLAYERS) break;
-        copy_str(g->pl[p].name, NAME_LEN, m->text);
+        /* "name|machine": the machine is shown next to the name. */
+        char text[NET_LINE_MAX];
+        copy_str(text, sizeof text, m->text);
+        char *bar = strchr(text, '|');
+        if (bar) *bar++ = '\0';
+        copy_str(g->pl[p].name, NAME_LEN, text);
+        net_set_player_from(p, bar ? bar : "");
         g->pl[p].cpu = m->num[1];
         g->pl[p].difficulty = m->num[2];
         break;

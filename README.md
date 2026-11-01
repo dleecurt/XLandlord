@@ -53,7 +53,7 @@ for printing. Both are installed in `$(prefix)/share/doc/viola-landlord`.
 
 Without the 75dpi fonts the game still runs; X picks the nearest fonts it has.
 
-Current version: **0.0.5** (see `CHANGELOG.md`).
+Current version: **0.0.6** (see `CHANGELOG.md`).
 
 ## Playing
 
@@ -103,6 +103,13 @@ joined; press **Start Game** when everyone is in.
 **Hosting.** The waiting room shows how to reach this machine: its host name
 and its IP addresses (loopback and link-local addresses are left out), for
 example `lee@gamebox (or the IP address: 192.168.1.20 / 2001:db8::5)`.
+
+**Who is where.** Each player's machine is shown next to his name, in both
+waiting rooms and in the player boxes: the host's own host name, and for a
+joiner the name of the machine his ssh connection comes from (the relay
+passes on ssh's `SSH_CONNECTION` client address and the host looks it up in
+its hosts file and DNS). A machine with no name is shown by its IP address,
+e.g. `Ann (from annbox)`, `Bea (from 203.0.113.45)`.
 
 **Joining.** Join a Network Game, and enter the host's address. You see the
 same board and the same dialogs as at the host; on your turn the Roll / Build /

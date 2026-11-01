@@ -127,6 +127,12 @@ static void addresses(void)
         CHECK(net_parse_address(bad[i], target, sizeof target, host, sizeof host, &p, err, sizeof err) < 0 && err[0],
               "bad address [%s] accepted", bad[i]);
     }
+    /* Labels: a name when one is known, else the address. */
+    char label[128];
+    net_host_label("127.0.0.1", label, sizeof label);
+    CHECK(!strcmp(label, "localhost"), "label of 127.0.0.1: [%s]", label);
+    net_host_label("192.0.2.77", label, sizeof label);
+    CHECK(!strcmp(label, "192.0.2.77"), "label of an address with no name: [%s]", label);
     /* Lookups: an IP address as it is; a name from the hosts file; an
      * unknown name refused with advice about DNS and /etc/hosts. */
     char found[512], err[600];
@@ -194,13 +200,31 @@ static void robot(const char *name, int leave_after)
 }
 
 /* Fork a robot joiner. */
-static pid_t spawn_robot(const char *name, int leave_after)
+/* `from` plays sshd's part: the client address the relay will report
+ * (NULL: as if the relay were not started by sshd). */
+static pid_t spawn_robot_from(const char *name, int leave_after, const char *from)
 {
     fflush(stdout);
     pid_t pid = fork();
-    if (pid == 0) { net_after_fork(); robot(name, leave_after); }
+    if (pid == 0) {
+        net_after_fork();
+        if (from) {
+            char sc[200];
+            snprintf(sc, sizeof sc, "%s 50000 127.0.0.1 22", from);
+            setenv("SSH_CONNECTION", sc, 1);
+        } else {
+            unsetenv("SSH_CONNECTION");
+        }
+        robot(name, leave_after);
+    }
     return pid;
 }
+
+static pid_t spawn_robot(const char *name, int leave_after)
+{
+    return spawn_robot_from(name, leave_after, "127.0.0.1");
+}
+
 
 /* Keep the host answering until `n` joiners wait in the lobby. */
 static int wait_lobby(int n)
@@ -276,10 +300,18 @@ int main(int argc, char **argv)
     /* 2 + 3: four humans. */
     CHECK(net_host(port, err, sizeof err) == 0, "host: %s", err);
     pid_t bots[3];
-    bots[0] = spawn_robot("Ann", 0);
-    bots[1] = spawn_robot("Bea", 0);
-    bots[2] = spawn_robot("Cal", 0);
+    /* Where they come from: Ann from 127.0.0.1 (named "localhost" in
+     * /etc/hosts), Bea from a TEST-NET address that has no name (so its
+     * address is shown), Cal not through sshd at all. */
+    bots[0] = spawn_robot_from("Ann", 0, "127.0.0.1");
+    CHECK(wait_lobby(1), "Ann in the lobby");
+    bots[1] = spawn_robot_from("Bea", 0, "192.0.2.77");
+    CHECK(wait_lobby(2), "Bea in the lobby");
+    bots[2] = spawn_robot_from("Cal", 0, NULL);
     CHECK(wait_lobby(3), "three joiners in the lobby (%d)", net_lobby_count());
+    CHECK(!strcmp(net_lobby_from(0), "localhost"), "Ann's machine: [%s]", net_lobby_from(0));
+    CHECK(!strcmp(net_lobby_from(1), "192.0.2.77"), "Bea's machine: [%s]", net_lobby_from(1));
+    CHECK(strstr(net_lobby_from(2), "unknown") != NULL, "Cal's machine: [%s]", net_lobby_from(2));
     pid_t extra = spawn_robot("Dan", 0);
     CHECK(wait_child(extra) == 3, "the fifth human was not turned away with the table-full warning");
     int found_warning = 0;
@@ -288,6 +320,11 @@ int main(int argc, char **argv)
     int np, over;
     int ncpu = play_hosted(&g, &np, &over);
     CHECK(np == 4 && ncpu == 0, "four humans: %d players, %d computer", np, ncpu);
+    char here[256] = "";
+    gethostname(here, sizeof here - 1);
+    CHECK(!strcmp(net_player_from(0), here), "the host's seat shows this machine: [%s]", net_player_from(0));
+    CHECK(!strcmp(net_player_from(1), "localhost") && !strcmp(net_player_from(2), "192.0.2.77"),
+          "seats show the joiners' machines: [%s] [%s]", net_player_from(1), net_player_from(2));
     CHECK(over, "the four-human network game did not end");
     net_close("Game over.");
     for (int i = 0; i < 3; i++) { int st = wait_child(bots[i]); CHECK(st == 0, "robot %d exited %d", i, st); }

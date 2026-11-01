@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.0.6 - 2026-10-31
+
+- Each player's machine is shown next to his name: in the host's waiting
+  room ("Ann (from annbox)"), in the joiners' waiting room, and in the
+  player boxes during the game ("Lee (host, gamebox)", "Ann (you, annbox)",
+  "Bea (network, 203.0.113.45)"). The host shows its own host name.
+- A joiner's machine is the client address of his ssh connection: the relay
+  reads it from `SSH_CONNECTION` and sends it to the host as the first line
+  (`FROM`); the host looks the address up in its hosts file and DNS, and
+  shows the IP address when there is no name. Only a connection's first
+  line may be a FROM, so a player cannot claim to be somewhere else.
+- The waiting room's message line says where a new player joined from.
+- Network protocol 4: 0.0.6 cannot play with 0.0.5. (A 0.0.5 relay still
+  works; its joiners show as "from an unknown machine".)
+- tests/net checks the labels: a named address, an address with no name,
+  and a relay not started by sshd.
+
 ## 0.0.5 - 2026-10-31
 
 - At start-up the game asks how to play: Host a Network Game, Join a

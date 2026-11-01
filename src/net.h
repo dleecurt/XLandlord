@@ -51,12 +51,16 @@
  * THE PROTOCOL: one message per line, plain ASCII, fields separated by single
  * spaces; numbers first, then (for some kinds) a free text to the end.
  *
+ *   relay -> host   FROM <ip address>               where the joiner's ssh came from
+ *                                                   (sshd's SSH_CONNECTION); always the
+ *                                                   first line, written by the relay itself
  *   joiner -> host  HELLO <protocol> <name>         ask for a seat
  *   host -> joiner  WELCOME <joined> <name of host>  you are in the lobby
  *   host -> joiner  REFUSE <text>                    turned away (table full...)
  *   host -> all     LOBBY <text>                     who is waiting, for display
  *   host -> all     START <you> <nplayers>           the game begins; you are player <you>
- *   host -> all     PLAYER <p> <cpu> <diff> <name>   a player's name and kind
+ *   host -> all     PLAYER <p> <cpu> <diff> <name>|<from>   a player's name, kind and
+ *                                                   machine (host name, or IP address)
  *   host -> all     STATE <numbers...>               the whole Game (net_encode_state)
  *   host -> all     LOG <text>                       a line of the record of events
  *   host -> all     TURN <p>                         it is player p's turn to act
@@ -73,7 +77,7 @@
 #include "game.h"
 
 #define NET_PORT        1904    /* the year of the patent */
-#define NET_PROTOCOL    3
+#define NET_PROTOCOL    4
 #define NET_LINE_MAX    4096
 #define NET_MAX_FIELDS  320
 #define NET_MAX_REMOTE  (MAXPLAYERS - 1)    /* the host plus three joiners */
@@ -82,7 +86,7 @@ typedef enum { NET_NONE, NET_HOST, NET_CLIENT } NetRole;
 
 typedef enum {
     NM_HELLO, NM_WELCOME, NM_REFUSE, NM_LOBBY, NM_START, NM_PLAYER, NM_STATE,
-    NM_LOG, NM_TURN, NM_ASK, NM_ANSWER, NM_ACTION, NM_NOTE, NM_BYE,
+    NM_LOG, NM_TURN, NM_ASK, NM_ANSWER, NM_ACTION, NM_NOTE, NM_BYE, NM_FROM,
     NM_COUNT, NM_BAD = -1
 } NetMsgKind;
 
@@ -166,6 +170,20 @@ void net_set_host_name(const char *name);
 int  net_host_poll(int ms);
 int  net_lobby_count(void);             /* joiners waiting */
 const char *net_lobby_name(int i);
+/* Where joiner i in the lobby connects from: the host name of his machine,
+ * or its IP address when no name is known for it. */
+const char *net_lobby_from(int i);
+
+/* Which machine player p plays at: for a joiner, the name of the machine his
+ * ssh came from (or its IP address); for the host's seat, this machine's
+ * name; "" for computer players and when not playing over the network.
+ * Joiners learn these from the host's PLAYER messages. */
+const char *net_player_from(int p);
+void net_set_player_from(int p, const char *from);
+
+/* The label for an IP address: its host name (looked up in the hosts file
+ * and DNS, as the system does), or the address itself if none is found. */
+void net_host_label(const char *ip, char *out, size_t size);
 /* Which messages the lobby sent recently ("Lee was turned away: ..."), for
  * the host's screen; NULL when none is new. */
 const char *net_host_event(void);

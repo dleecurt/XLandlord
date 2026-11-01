@@ -79,6 +79,13 @@ A name is looked up in DNS and
 .I /etc/hosts
 (the system resolver); one found in neither is reported before ssh is
 started. The host's waiting room shows its name and IP addresses.
+Next to each player's name the game shows his machine: the host's own
+name, or for a joiner the name of the machine his ssh connection came from
+(taken from ssh's
+.B SSH_CONNECTION
+by the relay and looked up in the host's
+.I /etc/hosts
+and DNS), or its IP address if it has no name.
 The joiner's game runs
 .PP
 .RS

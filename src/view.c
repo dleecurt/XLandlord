@@ -500,11 +500,29 @@ static int draw_player(int p, int x, int y, int w)
     xw_disc(x + 9, y + 7, d, app_player_color(p));
     xw_circle(x + 9, y + 7, d, XC_INK);
     char buf[160];
-    const char *tag = "";
-    if (net_role() == NET_CLIENT && p == app.me) tag = " (you)";
-    else if (net_seat_remote(p) && !P->cpu) tag = " (network)";
-    snprintf(buf, sizeof buf, "%s%s%s%s%s", P->name, P->cpu ? " (" : "", P->cpu ? diff_names[CLAMP(P->difficulty, 0, 2)] : "",
-             P->cpu ? ")" : "", tag);
+    /* In a network game each human's machine follows his name: "Ann (you,
+     * annbox)", "Lee (host, gamebox)", "Bea (network, 192.168.1.33)". */
+    char tag[200] = "";
+    const char *from = !P->cpu ? net_player_from(p) : "";
+    const char *role = net_role() == NET_CLIENT && p == app.me ? "you"
+                     : p == 0 && net_role() != NET_NONE && from[0] ? "host"
+                     : net_role() == NET_CLIENT || net_seat_remote(p) ? "network" : "";
+    /* Keep clear of the cash on the right: shorten the machine's name
+     * ("annbox.example.org" -> "annbox.exam...") until the line fits. */
+    char cashbuf[24], shown[128];
+    snprintf(cashbuf, sizeof cashbuf, "$%d", P->cash);
+    int room = w - 30 - d - xw_text_width(XF_UI, cashbuf, (int)strlen(cashbuf));
+    copy_str(shown, sizeof shown, from);
+    for (;;) {
+        if (!P->cpu && role[0]) snprintf(tag, sizeof tag, shown[0] ? " (%s, %s)" : " (%s)", role, shown);
+        snprintf(buf, sizeof buf, "%s%s%s%s%s", P->name, P->cpu ? " (" : "", P->cpu ? diff_names[CLAMP(P->difficulty, 0, 2)] : "",
+                 P->cpu ? ")" : "", tag);
+        size_t n = strlen(shown);
+        if (xw_text_width(XF_UI, buf, (int)strlen(buf)) <= room || n <= 6) break;
+        if (n > 3 && !strcmp(shown + n - 3, "...")) n -= 3;     /* already shortened: take off the dots */
+        shown[n - 1] = '\0';
+        snprintf(shown + strlen(shown), sizeof shown - strlen(shown), "...");
+    }
     xw_clip(x + 4, y + 4, w - 8, h - 8);
     xw_text(XF_UI, x + 15 + d, y + 6 + xw_ascent(XF_UI), buf, (int)strlen(buf), XC_INK);
     snprintf(buf, sizeof buf, "$%d", P->cash);
