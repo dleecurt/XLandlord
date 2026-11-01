@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.0.10 - 2026-10-31
+
+- One computer player at most, at any table. Its skill (Easy, Medium or
+  Hard) is set for the whole game by whoever sets the game up - the New
+  Game form at this screen, the host's setup in a network game - and no
+  player chooses a skill for himself.
+- The New Game form: seats are Empty, Human or Computer (one Computer seat
+  at most), with a single Computer skill row.
+- Network play: once the game has started nobody new joins and the computer
+  player stays to the end. A joiner who leaves, or whose connection drops,
+  is out of the game: his cards go back into the pack, his houses come
+  down, his cash goes with him, and nobody takes his seat (until now a
+  medium computer player took over, which could make a second one). His
+  box shows that he has left; standings list him last. With one player
+  left the game is over. Before the start, a fourth human still takes the
+  computer player's seat.
+- Preferences: `seatN = computer` and one `cpu_skill`, used here and for
+  hosted games, replace the per-seat levels and `net_cpu`; older files are
+  converted (the first computer seat is kept, at its level).
+- Network protocol 5 (the state says who has left): 0.0.10 cannot play
+  with 0.0.9.
+- tests/engine checks a player leaving mid-game; tests/net checks that a
+  quitter's seat is not taken and exactly one computer player remains.
+
 ## 0.0.9 - 2026-10-31
 
 - The printable rule book, `xlandlord-rules.pdf`, stays: it is built and

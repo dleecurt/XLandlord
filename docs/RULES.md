@@ -3,7 +3,7 @@
 *Lizzie J. Magie's game of 1904, by the rules of 1906, with the Single Tax,
 for one to four players at one screen or over the network.*
 
-XLandlord 0.0.9. Copyright (C) 2026 Lee Curtis. This document is
+XLandlord 0.0.10. Copyright (C) 2026 Lee Curtis. This document is
 part of the program and is free under the GNU General Public License,
 version 3 or later; the rules it describes are those of the public-domain 1904
 patent and 1906 rule book.
@@ -109,10 +109,12 @@ The **New Game** form:
 
 ![The New Game form.](images/new-game.png)
 
-- **Seats 1 to 4.** Each seat is *Empty*, *Human*, *Easy*, *Medium* or *Hard*.
-  Humans play at this screen and take turns at the keyboard; Easy, Medium and
-  Hard are computer players. A table needs at least two players and at least
-  one human. Seats play in order; empty seats are skipped.
+- **Seats 1 to 4.** Each seat is *Empty*, *Human* or *Computer*. Humans play
+  at this screen and take turns at the keyboard. **One seat at most** may be
+  the computer player. A table needs at least two players and at least one
+  human. Seats play in order; empty seats are skipped.
+- **Computer skill.** *Easy*, *Medium* or *Hard*: how the computer player
+  plays. It is set here, for the whole game, by whoever sets the game up.
 - **Game ends at wages.** 3, 5 (the 1906 rule), 7 or 10.
 - **Rules.** *Standard*, or *Advanced* (the "advanced and scientific" rules of
   section 14).
@@ -450,15 +452,20 @@ lots are worth nothing**, and:
 The center of the board says THE SINGLE TAX IS IN FORCE, and its boxes show
 the Treasury and the wages.
 
-## 16. The computer players
+## 16. The computer player
+
+One computer player at most sits at the table. Its skill is chosen when the
+game is set up (the New Game form, or the host's setup in a network game),
+for everyone; no player chooses his own.
 
 | Level | How it plays |
 | ----- | ------------ |
 | **Easy** | On impulse: buys about half of what it can afford, seldom bids or builds, chooses its moves at random, keeps little cash in hand. |
 | **Medium** | By rules of thumb: buys and builds while keeping $100 in hand, bids a little over the price for good cards, pays out of Jail early in the game, avoids an obviously dear square when it has a choice. |
-| **Hard** | By counting: values each card at 100 plus the rent it should bring in the circuits left, keeps in hand what a trip round the board is likely to cost, goes after railroad monopolies and the Municipal Cinch and blocks yours, bids up to a card's worth, stays in Jail late in the game when the board is dangerous, picks the cheaper square for a pass or a backward move, trades with the other computer players, and votes on the Single Tax by what it does to its standing. |
+| **Hard** | By counting: values each card at 100 plus the rent it should bring in the circuits left, keeps in hand what a trip round the board is likely to cost, goes after railroad monopolies and the Municipal Cinch and blocks yours, bids up to a card's worth, stays in Jail late in the game when the board is dangerous, picks the cheaper square for a pass or a backward move, and votes on the Single Tax by what it does to its standing. |
 
-In the program's own tests (hundreds of games between computer players) Hard
+In the program's own tests (hundreds of games between computer players of
+different levels, which only the test sets up) Hard
 beats Easy about 96 times in 100, Medium beats Easy about 86, and Hard beats
 Medium about 59: the dice still have their say.
 
@@ -530,9 +537,15 @@ for an IPv6 address with a port, put the address in brackets:
 **The table.** Four players at most: the host and three joiners. A fifth
 player is turned away with a warning, and so is anyone joining a game already
 under way. When fewer than four humans sit down, **one** computer player takes
-a free seat; four humans play without one. If a joiner's connection drops, a
-computer player of medium strength takes over his seat and the game goes on;
-if the host leaves, the game ends for everyone.
+a free seat, at the skill the host chose; four humans play without one (a
+fourth human who joins before the start takes its seat).
+
+**Leaving.** Once the game starts the table is closed: nobody new joins, and
+the computer player stays to the end. A human may leave (Game > Quit, or his
+connection drops). He is out of the game: his cards go back into the pack,
+his houses come down, his cash goes with him, and nobody takes his seat; his
+box says he has left. If only one player is left the game is over. If the
+host leaves, the game ends for everyone.
 
 **What you need.** The same version of the game on every machine, an ssh
 server on the host, and **password-less ssh** from each joiner to the host. On

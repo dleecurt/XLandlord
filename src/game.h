@@ -87,6 +87,8 @@ typedef struct {
     int luxuries;               /* luxury cards held (count 100 each) */
     int education;              /* Single Tax: Education cards */
     int professors;             /* Single Tax: Professor cards (count 100 each) */
+    int left;                   /* has left the game (a network player who went away):
+                                   skipped from then on, holds nothing */
 } Player;
 
 typedef struct Game Game;
@@ -230,6 +232,18 @@ int game_houses_total(const Game *g);
 int game_worth(const Game *g, int p);
 /* The leading player (highest worth). */
 int game_leader(const Game *g);
+
+/* Is p still at the table (has not left the game)? */
+static inline int game_active(const Game *g, int p) { return !g->pl[p].left; }
+/* The number of players still at the table. */
+int game_active_count(const Game *g);
+
+/* p leaves the game for good (a network player whose connection went, or
+ * who quit). His cards go back into the pack, every house he built comes
+ * down, his cash leaves with him, a Trust he was in is dissolved, and his
+ * turns are skipped from then on. If fewer than two players are left the
+ * game is over. If it was his turn, the rest of it is not played. */
+void game_player_leaves(Game *g, int p);
 /* The section (0..7) of a space between a corner and a railroad, or -1. */
 int game_section(int sp);
 

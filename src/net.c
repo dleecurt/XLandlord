@@ -115,7 +115,7 @@ int net_parse(const char *line, NetMsg *m)
 }
 
 #define STATE_HEAD   15
-#define STATE_PLAYER 12
+#define STATE_PLAYER 13
 #define STATE_SPACE  5
 
 /* See net.h: the Game as numbers - a header, then each player, then each
@@ -132,7 +132,8 @@ int net_encode_state(const Game *g, int *num, int max)
     for (int p = 0; p < g->nplayers; p++) {
         const Player *P = &g->pl[p];
         int f[STATE_PLAYER] = { P->cpu, P->difficulty, P->cash, P->pos, P->in_jail, P->jail_turns,
-                                P->in_poorhouse, P->natural_opp, P->wages, P->luxuries, P->education, P->professors };
+                                P->in_poorhouse, P->natural_opp, P->wages, P->luxuries, P->education, P->professors,
+                                P->left };
         for (int i = 0; i < STATE_PLAYER; i++) num[k++] = f[i];
     }
     for (int s = 0; s < NSPACES; s++) {
@@ -166,6 +167,7 @@ int net_decode_state(Game *g, const int *num, int n)
         P->pos = CLAMP(pos, 0, NSPACES - 1);
         P->in_jail = num[k++]; P->jail_turns = num[k++]; P->in_poorhouse = num[k++]; P->natural_opp = num[k++];
         P->wages = num[k++]; P->luxuries = num[k++]; P->education = num[k++]; P->professors = num[k++];
+        P->left = num[k++] != 0;
     }
     for (int s = 0; s < NSPACES; s++) {
         int o = num[k++];
@@ -450,8 +452,10 @@ static void send_lobby(void)
     for (int i = 0; i < nlobby; i++) send_msg(conns[lobby[i]].in.fd, NM_LOBBY, NULL, 0, text);
 }
 
-/* A joiner has gone: out of the lobby, or out of the game (a computer
- * player takes the seat). */
+/* A joiner has gone: out of the lobby, or out of the game. Once the game
+ * has started nobody takes his place - not a computer player, not a
+ * newcomer: he leaves the game (game_player_leaves) and play goes on
+ * without him. */
 static void drop(int c)
 {
     if (!conns[c].open) return;
@@ -469,10 +473,8 @@ static void drop(int c)
     }
     if (p >= 0 && hgame && seat_conn[p] == c) {
         seat_conn[p] = -1;
-        hgame->pl[p].cpu = 1;
-        hgame->pl[p].difficulty = DIFF_MEDIUM;
         event("%s has left the game.%s", name, "");
-        game_log(hgame, "%s has left the game; a computer player (medium) takes the seat.", name);
+        game_player_leaves(hgame, p);
     }
 }
 
@@ -753,8 +755,7 @@ int net_ask(int p, NetAsk kind, int a, int b, int c, const char *text)
     return -1;
 }
 
-/* See net.h: BYE to everyone, close; hosted seats of joiners go to computer
- * players. */
+/* See net.h: BYE to everyone, close; joiners still seated leave the game. */
 void net_close(const char *why)
 {
     if (role == NET_HOST) {
@@ -767,7 +768,7 @@ void net_close(const char *why)
         listen_fd = -1;
         if (hgame)
             for (int p = 0; p < hgame->nplayers; p++)
-                if (seat_remote[p] && !hgame->pl[p].cpu) { hgame->pl[p].cpu = 1; hgame->pl[p].difficulty = DIFF_MEDIUM; }
+                if (seat_remote[p]) game_player_leaves(hgame, p);
         for (int p = 0; p < MAXPLAYERS; p++) seat_conn[p] = -1;
         nlobby = 0;
         lobby_open = 0;
@@ -806,7 +807,8 @@ static void nd_deal_buy(Game *g, int p, const int *cards, int n, int *want)
 #define ASK_OR_AI(kind, a, b, c, ai_call) \
     do { int r_ = net_ask(p, kind, a, b, c, NULL); return r_ >= 0 ? r_ : (ai_call); } while (0)
 
-/* Rule 7 for a joiner (the computer answers if he is gone). */
+/* Rule 7 for a joiner (if he has gone, the computer's answer stands in:
+ * he has no money, so it comes to nothing). */
 static int nd_buy(Game *g, int p, int sp, int price, int hb)
 { ASK_OR_AI(NA_BUY, sp, price, hb, ai_decider.buy(g, p, sp, price, hb)); }
 
@@ -884,8 +886,7 @@ static void nd_pre_roll(Game *g, int p)
         net_broadcast(g);
         net_turn(p);
     }
-    /* The joiner left during his turn: the computer finishes it. */
-    if (g->pl[p].cpu) ai_decider.pre_roll(g, p);
+    /* (If the joiner left during his turn, game_turn ends it.) */
 }
 
 const Decider net_decider = {

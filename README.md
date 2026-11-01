@@ -69,12 +69,14 @@ arrow keys) turn the pages.
 
 Without the 75dpi fonts the game still runs; X picks the nearest fonts it has.
 
-Current version: **0.0.9** (see `CHANGELOG.md`).
+Current version: **0.0.10** (see `CHANGELOG.md`).
 
 ## Playing
 
 A new game starts with the **New Game** form: four seats, each **Empty,
-Human, Easy, Medium or Hard** (two to four players, at least one human), how
+Human or Computer** (two to four players, at least one human, and **one
+computer player at most**), the **computer skill** for the game (Easy,
+Medium or Hard), how
 many times a player draws his wages before the game ends (the 1906 rules say
 five) and the rules (standard, or the 1906 "advanced and scientific" rules).
 Each human seat is asked for its player's name. Then the cards are dealt
@@ -154,10 +156,15 @@ for an IPv6 address with a port, put the address in brackets:
 - Four players at most: the host and three joiners. A fifth player who tries to
   join is turned away with a warning ("The table is full..."); so is anyone who
   tries to join a game that has already started.
-- If fewer than four humans play, **one** computer player takes a free seat.
-  With four humans there is no computer player.
-- If a joiner's connection drops, a computer player (medium) takes over his
-  seat and the game goes on. If the host leaves, the game ends for everyone.
+- If fewer than four humans play, **one** computer player takes a free seat,
+  at the skill the host chose; joiners have no say in it. With four humans
+  there is no computer player: a fourth human who joins before the start
+  takes its seat.
+- Once the game has started nobody new may join, and the computer player
+  stays to the end. A human may leave (or his connection drop): he is out,
+  his cards go back into the pack and his houses come down, and nobody takes
+  his seat. With one player left the game is over. If the host leaves, the
+  game ends for everyone.
 
 **How it works.** The joiner's program runs
 
@@ -234,15 +241,19 @@ Magie and the Game tells its history.
 The richest player at the end wins: cash, plus 100 for every card, every house
 and every luxury (and every Professor card under the Single Tax).
 
-### The computer players
+### The computer player
+
+There is one computer player at most, and its skill is set for the game by
+whoever sets the game up (the host, in a network game):
 
 | Level  | How it plays |
 | ------ | ------------ |
 | Easy   | On impulse: buys about half of what it can afford, almost never bids or builds, picks moves at random, keeps little cash. |
 | Medium | By rules of thumb: buys and builds while it keeps a $100 cushion, bids a little over the price for good cards, pays out of Jail early in the game, avoids an obviously expensive square. |
-| Hard   | By counting: values each card at 100 plus the rent it should bring in the circuits left, keeps in hand what the trip round the board is likely to cost, hunts railroad monopolies and the Municipal Cinch (and blocks yours), bids up to a card's worth, sits in Jail late in the game when the board is dangerous, picks the cheapest square for a pass or a backward move, trades with the other computer players, and votes on the Single Tax by what it does to its standing. |
+| Hard   | By counting: values each card at 100 plus the rent it should bring in the circuits left, keeps in hand what the trip round the board is likely to cost, hunts railroad monopolies and the Municipal Cinch (and blocks yours), bids up to a card's worth, sits in Jail late in the game when the board is dangerous, picks the cheapest square for a pass or a backward move, and votes on the Single Tax by what it does to its standing. |
 
-`make check` plays them against each other. Over the test's games Hard beats
+`make check` plays the levels against each other (the rules engine can
+seat several; the game never does). Over the test's games Hard beats
 Easy about 96% of the time, Medium beats Easy about 86%, and Hard beats Medium
 about 59% (the dice still have their say).
 
@@ -253,11 +264,14 @@ slow), **Ask Me to Bid** (off: you are never asked to bid when a computer
 player lands on an unowned card), **Confirm Each Computer Move** (wait for a key
 after every computer turn). They are kept in
 `~/.config/xlandlord/preferences.conf` (`$XDG_CONFIG_HOME` is honored),
-with the seats as `seat1` .. `seat4` (`empty`, `human`, `easy`, `medium`,
-`hard`) and the human names as `name1` .. `name4`; for network play
+with the seats as `seat1` .. `seat4` (`empty`, `human`, `computer`; one
+`computer` at most), the computer player's skill as `cpu_skill` (`easy`,
+`medium`, `hard`; also used for hosted games) and the human names as
+`name1` .. `name4`; for network play
 `net_host` (the last host joined), `net_port` (the port to host on),
-`net_command` (the program ssh runs on the host, normally `XLandlord`) and
-`net_cpu` (the hosted game's computer player). A 0.0.1 file is converted,
+`net_command` (the program ssh runs on the host, normally `XLandlord`).
+Older files are converted (a level per computer seat and `net_cpu` become
+one computer seat and `cpu_skill`); a 0.0.1 file is converted too,
 and a file from before the game was renamed XLandlord
 (`~/.config/viola-landlord/preferences.conf`) is read once and saved under
 the new name.

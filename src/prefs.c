@@ -30,14 +30,11 @@
 #include "util.h"
 
 /* See prefs.h. */
-int prefs_seat_difficulty(int kind)
+int prefs_computers(const Prefs *p)
 {
-    switch (kind) {
-    case SEAT_EASY:   return DIFF_EASY;
-    case SEAT_MEDIUM: return DIFF_MEDIUM;
-    case SEAT_HARD:   return DIFF_HARD;
-    default:          return -1;
-    }
+    int n = 0;
+    for (int i = 0; i < NSEATS; i++) n += p->seat[i] == SEAT_COMPUTER;
+    return n;
 }
 
 /* See prefs.h. */
@@ -67,7 +64,7 @@ void prefs_defaults(Prefs *p)
     for (int i = 1; i < NSEATS; i++) snprintf(p->names[i], sizeof p->names[i], "Player %d", i + 1);
     /* One human against one computer player of medium strength. */
     p->seat[0] = SEAT_HUMAN;
-    p->seat[1] = SEAT_MEDIUM;
+    p->seat[1] = SEAT_COMPUTER;
     p->seat[2] = p->seat[3] = SEAT_EMPTY;
     p->end_wages = 5;
     p->advanced = 0;
@@ -77,10 +74,18 @@ void prefs_defaults(Prefs *p)
     p->net_host[0] = '\0';
     p->net_port = 1904;
     copy_str(p->net_command, sizeof p->net_command, "XLandlord");
-    p->net_cpu = SEAT_MEDIUM;
+    p->cpu_skill = DIFF_MEDIUM;
 }
 
-static const char *const seat_word[SEAT_KINDS] = { "empty", "human", "easy", "medium", "hard", "network" };
+static const char *const seat_word[SEAT_KINDS] = { "empty", "human", "computer", "network" };
+static const char *const skill_word[3] = { "easy", "medium", "hard" };   /* DIFF_* */
+
+/* DIFF_* from "easy" / "medium" / "hard", or -1. */
+static int skill_from_word(const char *w)
+{
+    for (int i = 0; i < 3; i++) if (!strcmp(w, skill_word[i])) return i;
+    return -1;
+}
 
 /* A seat kind from its word in the file ("human", "hard"...), or -1. */
 static int seat_from_word(const char *w)
@@ -113,8 +118,10 @@ static int config_dir(char *out, size_t size, int make)
     return config_dir_named(out, size, make, "xlandlord");
 }
 
-/* See prefs.h. Unknown keys are ignored; 0.0.1 files (name, difficulty,
- * opponents) are converted. */
+/* See prefs.h. Unknown keys are ignored. Older files are converted: 0.0.1
+ * (name, difficulty, opponents) and 0.0.2 to 0.0.9 (a level for each
+ * computer seat, net_cpu for hosted games) become one computer seat at
+ * most, with its level as cpu_skill. */
 void prefs_load(Prefs *p)
 {
     char dir[600], path[700], line[256];
@@ -132,7 +139,8 @@ void prefs_load(Prefs *p)
         if (!(f = fopen(path, "r"))) return;
         migrated = 1;
     }
-    int old_diff = SEAT_MEDIUM;
+    int skill_given = 0;        /* a cpu_skill line was read: it wins over older keys */
+    int seat_skill = 0;         /* the first old easy/medium/hard seat gave the skill */
     while (fgets(line, sizeof line, f)) {
         char *eq = strchr(line, '=');
         if (line[0] == '#' || !eq) continue;
@@ -147,16 +155,23 @@ void prefs_load(Prefs *p)
          * players of one `difficulty`. */
         if (!strcmp(key, "name") && *val) copy_str(p->names[0], sizeof p->names[0], val);
         else if (!strcmp(key, "difficulty")) {
-            old_diff = !strcmp(val, "easy") ? SEAT_EASY : !strcmp(val, "hard") ? SEAT_HARD : SEAT_MEDIUM;
-            for (int i = 1; i < NSEATS; i++) if (p->seat[i] >= SEAT_EASY && p->seat[i] <= SEAT_HARD) p->seat[i] = old_diff;
+            int d = skill_from_word(val);
+            if (d >= 0 && !skill_given) p->cpu_skill = d;
         }
         else if (!strcmp(key, "opponents")) {
-            n = CLAMP(n, 1, 3);
-            for (int i = 1; i < NSEATS; i++) p->seat[i] = i <= n ? old_diff : SEAT_EMPTY;
+            for (int i = 1; i < NSEATS; i++) p->seat[i] = i == 1 ? SEAT_COMPUTER : SEAT_EMPTY;
         }
         else if (!strncmp(key, "seat", 4) && key[4] >= '1' && key[4] <= '0' + NSEATS && !key[5]) {
-            int k = seat_from_word(val);
+            int k = seat_from_word(val), d = skill_from_word(val);
+            if (d >= 0) {               /* 0.0.2 - 0.0.9: easy / medium / hard seats */
+                k = SEAT_COMPUTER;
+                if (!skill_given && !seat_skill) { p->cpu_skill = d; seat_skill = 1; }
+            }
             if (k >= 0 && k != SEAT_NETWORK) p->seat[key[4] - '1'] = k;
+        }
+        else if (!strcmp(key, "cpu_skill")) {
+            int d = skill_from_word(val);
+            if (d >= 0) { p->cpu_skill = d; skill_given = 1; }
         }
         else if (!strncmp(key, "name", 4) && key[4] >= '1' && key[4] <= '0' + NSEATS && !key[5] && *val)
             copy_str(p->names[key[4] - '1'], sizeof p->names[0], val);
@@ -168,9 +183,15 @@ void prefs_load(Prefs *p)
         else if (!strcmp(key, "net_host")) copy_str(p->net_host, sizeof p->net_host, val);
         else if (!strcmp(key, "net_port") && n > 0 && n < 65536) p->net_port = n;
         else if (!strcmp(key, "net_command") && *val) copy_str(p->net_command, sizeof p->net_command, val);
-        else if (!strcmp(key, "net_cpu")) { int k = seat_from_word(val); if (k >= SEAT_EASY && k <= SEAT_HARD) p->net_cpu = k; }
+        else if (!strcmp(key, "net_cpu")) {     /* 0.0.3 - 0.0.9: used if no seat gave a level */
+            int d = skill_from_word(val);
+            if (d >= 0 && !skill_given && !seat_skill) p->cpu_skill = d;
+        }
     }
     fclose(f);
+    /* One computer player at most: later computer seats become empty. */
+    for (int i = 0, seen = 0; i < NSEATS; i++)
+        if (p->seat[i] == SEAT_COMPUTER && ++seen > MAX_CPU_PLAYERS) p->seat[i] = SEAT_EMPTY;
     /* A table needs two players and someone at the screen. */
     if (prefs_seats_used(p) < 2 || prefs_humans(p) < 1) {
         Prefs d;
@@ -193,22 +214,23 @@ int prefs_save(const Prefs *p)
     FILE *f = fopen(path, "w");
     if (!f) return 0;
     fprintf(f, "# XLandlord preferences (written by the program; edit freely)\n");
-    fprintf(f, "# seatN = empty | human | easy | medium | hard; nameN = a human seat's name\n");
+    fprintf(f, "# seatN = empty | human | computer (one computer seat at most); nameN = a human seat's name\n");
     for (int i = 0; i < NSEATS; i++) {
         fprintf(f, "seat%d = %s\n", i + 1, seat_word[CLAMP(p->seat[i], 0, SEAT_KINDS - 1)]);
         fprintf(f, "name%d = %s\n", i + 1, p->names[i]);
     }
     fprintf(f, "end_wages = %d\n", p->end_wages);
     fprintf(f, "advanced = %d\n", p->advanced);
+    fprintf(f, "# the computer player's strength, here and in hosted games: easy | medium | hard\n");
+    fprintf(f, "cpu_skill = %s\n", skill_word[CLAMP(p->cpu_skill, DIFF_EASY, DIFF_HARD)]);
     fprintf(f, "ask_bids = %d\n", p->ask_bids);
     fprintf(f, "confirm_cpu = %d\n", p->confirm_cpu);
     fprintf(f, "speed = %d\n", p->speed);
     fprintf(f, "# network play: the last host joined, the port to host on, the program ssh runs on\n"
-               "# the host (give a full path if it is not on the host's PATH), the computer player\n");
+               "# the host (give a full path if it is not on the host's PATH)\n");
     fprintf(f, "net_host = %s\n", p->net_host);
     fprintf(f, "net_port = %d\n", p->net_port);
     fprintf(f, "net_command = %s\n", p->net_command);
-    fprintf(f, "net_cpu = %s\n", seat_word[CLAMP(p->net_cpu, SEAT_EASY, SEAT_HARD)]);
     return fclose(f) == 0;
 }
 

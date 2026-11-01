@@ -213,7 +213,7 @@ static void begin(Game *g)
 }
 
 /* Start a game at this screen from the seats in the preferences (hot-seat
- * humans and computer players). */
+ * humans and the one computer player, at the game's computer skill). */
 static void start_game(void)
 {
     GameSettings s;
@@ -231,8 +231,9 @@ static void start_game(void)
         if (kind == SEAT_HUMAN) {
             copy_str(s.names[p], NAME_LEN, app.prefs.names[i]);
         } else {
+            if (ncpu >= MAX_CPU_PLAYERS) { s.nplayers--; continue; }   /* (prefs_load allows one) */
             s.cpu[p] = 1;
-            s.difficulty[p] = prefs_seat_difficulty(kind);
+            s.difficulty[p] = CLAMP(app.prefs.cpu_skill, DIFF_EASY, DIFF_HARD);
             copy_str(s.names[p], NAME_LEN, cpu_names[ncpu++ % 4]);
         }
     }
@@ -265,40 +266,53 @@ static void start_network_game(void)
     begin(g);
 }
 
-/* The settings form: who sits where, the length and the rules. Returns 1 if
- * confirmed (and the seats make a table). */
+/* The settings form: who sits where, the computer player's skill, the
+ * length and the rules. One seat at most may be the computer player, and
+ * its skill is set here for the whole game. Returns 1 if confirmed (and
+ * the seats make a table). */
 static int settings_form(const char *title, const char *ok)
 {
-    static const char *const kinds[] = { "Empty", "Human", "Easy", "Medium", "Hard" };
+    static const char *const kinds[] = { "Empty", "Human", "Computer" };   /* SEAT_EMPTY..SEAT_COMPUTER */
+    static const char *const skills[] = { "Easy", "Medium", "Hard" };      /* DIFF_* */
     static const char *const lens[] = { "3", "5", "7", "10" };
     static const char *const rules[] = { "Standard", "Advanced" };
     static const int len_val[] = { 3, 5, 7, 10 };
     UiRow rows[] = {
-        { "Seat 1", kinds, 5 }, { "Seat 2", kinds, 5 }, { "Seat 3", kinds, 5 }, { "Seat 4", kinds, 5 },
+        { "Seat 1", kinds, 3 }, { "Seat 2", kinds, 3 }, { "Seat 3", kinds, 3 }, { "Seat 4", kinds, 3 },
+        { "Computer skill", skills, 3 },
         { "Game ends at wages", lens, 4 },
         { "Rules", rules, 2 },
     };
-    int sel[6];
+    int sel[7];
     for (int i = 0; i < NSEATS; i++) sel[i] = app.prefs.seat[i] == SEAT_NETWORK ? SEAT_EMPTY : app.prefs.seat[i];
-    sel[4] = 1;
-    for (int i = 0; i < 4; i++) if (len_val[i] == app.prefs.end_wages) sel[4] = i;
-    sel[5] = app.prefs.advanced;
+    sel[4] = CLAMP(app.prefs.cpu_skill, DIFF_EASY, DIFF_HARD);
+    sel[5] = 1;
+    for (int i = 0; i < 4; i++) if (len_val[i] == app.prefs.end_wages) sel[5] = i;
+    sel[6] = app.prefs.advanced;
     for (;;) {
         if (!ui_form(title,
-                     "Seats play in order. Human seats share this screen and take turns at it; Easy, Medium and "
-                     "Hard are computer players. The 1906 rules end the game when a player has drawn his wages "
-                     "five times. The advanced rules double taxes and land rents as houses go up.",
-                     rows, 6, sel, ok))
+                     "Seats play in order. Human seats share this screen and take turns at it. One seat may be "
+                     "the computer player; its skill is set here for the game. The 1906 rules end the game when "
+                     "a player has drawn his wages five times. The advanced rules double taxes and land rents as "
+                     "houses go up.",
+                     rows, 7, sel, ok))
             return 0;
-        int used = 0, hum = 0;
-        for (int i = 0; i < NSEATS; i++) { used += sel[i] != SEAT_EMPTY; hum += sel[i] == SEAT_HUMAN; }
-        if (used >= 2 && hum >= 1) break;
-        ui_message(title, used < 2 ? "The Landlord's Game needs at least two players."
-                                   : "At least one seat must be a human player.");
+        int used = 0, hum = 0, cpu = 0;
+        for (int i = 0; i < NSEATS; i++) {
+            used += sel[i] != SEAT_EMPTY;
+            hum += sel[i] == SEAT_HUMAN;
+            cpu += sel[i] == SEAT_COMPUTER;
+        }
+        if (used >= 2 && hum >= 1 && cpu <= MAX_CPU_PLAYERS) break;
+        ui_message(title, cpu > MAX_CPU_PLAYERS ? "Only one seat may be the computer player. Make the others "
+                                                  "Human or Empty."
+                          : used < 2 ? "The Landlord's Game needs at least two players."
+                          : "At least one seat must be a human player.");
     }
     for (int i = 0; i < NSEATS; i++) app.prefs.seat[i] = sel[i];
-    app.prefs.end_wages = len_val[sel[4]];
-    app.prefs.advanced = sel[5];
+    app.prefs.cpu_skill = sel[4];
+    app.prefs.end_wages = len_val[sel[5]];
+    app.prefs.advanced = sel[6];
     /* Names for the human seats (Enter keeps the one shown). */
     for (int i = 0; i < NSEATS; i++) {
         if (app.prefs.seat[i] != SEAT_HUMAN) continue;
@@ -570,7 +584,7 @@ static void cmd_trade_sell(void)
     const char *bptr[MAXPLAYERS];
     int who[MAXPLAYERS], price[MAXPLAYERS], nb = 0;
     for (int q = 0; q < g->nplayers; q++) {
-        if (q == p) continue;
+        if (q == p || !game_active(g, q)) continue;
         if (g->pl[q].cpu) {
             int o = ai_offer_for(g, q, sp);
             if (o <= 0) continue;
@@ -637,10 +651,13 @@ static void cmd_scores(const char *title)
     static const char *ptr[17];
     int order[MAXPLAYERS], n = g->nplayers, k = 0;
     for (int i = 0; i < n; i++) order[i] = i;
+    /* Richest first; players who left the game go last. */
+#define RANK(q) (game_active(g, q) ? game_worth(g, q) : -1)
     for (int i = 1; i < n; i++)
-        for (int j = i; j > 0 && game_worth(g, order[j]) > game_worth(g, order[j - 1]); j--) {
+        for (int j = i; j > 0 && RANK(order[j]) > RANK(order[j - 1]); j--) {
             int t = order[j]; order[j] = order[j - 1]; order[j - 1] = t;
         }
+#undef RANK
     snprintf(lines[k++], 120, "%-18s %6s %6s %6s %6s %7s", "Player", "Cash", "Cards", "Houses", "Lux.", "Worth");
     snprintf(lines[k++], 120, "%-18s %6s %6s %6s %6s %7s", "------", "----", "-----", "------", "----", "-----");
     for (int i = 0; i < n; i++) {
@@ -648,8 +665,9 @@ static void cmd_scores(const char *title)
         int cards = 0;
         for (int sp = 0; sp < NSPACES; sp++)
             if (g->owner[sp] == order[i] && !(g->single_tax && board[sp].type == T_LOT)) cards++;
-        snprintf(lines[k++], 120, "%-18.18s %6d %6d %6d %6d %7d", P->name, P->cash, cards,
-                 game_houses_of(g, order[i]), P->luxuries + P->professors, game_worth(g, order[i]));
+        if (P->left) snprintf(lines[k++], 120, "%-18.18s   (left the game)", P->name);
+        else snprintf(lines[k++], 120, "%-18.18s %6d %6d %6d %6d %7d", P->name, P->cash, cards,
+                      game_houses_of(g, order[i]), P->luxuries + P->professors, game_worth(g, order[i]));
     }
     snprintf(lines[k++], 120, " ");
     snprintf(lines[k++], 120, "Every card, house and luxury counts 100%s.",

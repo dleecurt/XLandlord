@@ -37,16 +37,21 @@
  *
  *   The table holds four players at most: the host and up to three joiners.
  *   A fifth human is turned away with a warning (REFUSE). When fewer than four
- *   humans sit down, ONE computer player takes a free seat; with four humans
- *   there is no computer player.
+ *   humans sit down, ONE computer player, at the skill the host chose, takes
+ *   a free seat; with four humans there is no computer player. Joiners have
+ *   no say in the computer player or its skill.
+ *
+ *   Once the game has started the table is closed: nobody new joins, and the
+ *   computer player stays to the end. A human may leave (or his connection
+ *   drop); he is out of the game - his cards go back into the pack and his
+ *   houses come down (game_player_leaves) - and nobody takes his seat.
  *
  *   The host's engine asks each remote seat its questions through
  *   net_decider: the question goes out as ASK and the engine waits for the
  *   ANSWER, exactly as it waits for a dialog. Joiners hold no rules: they draw
  *   the STATE the host sends after every change and answer ASKs with the same
  *   dialogs a local player sees. On his turn a joiner's builds, trades, sales,
- *   proposals and his throw come to the host as ACTIONs. If a joiner's
- *   connection drops, a computer player (medium) takes his seat.
+ *   proposals and his throw come to the host as ACTIONs.
  *
  * THE PROTOCOL: one message per line, plain ASCII, fields separated by single
  * spaces; numbers first, then (for some kinds) a free text to the end.
@@ -77,7 +82,7 @@
 #include "game.h"
 
 #define NET_PORT        1904    /* the year of the patent */
-#define NET_PROTOCOL    4
+#define NET_PROTOCOL    5
 #define NET_LINE_MAX    4096
 #define NET_MAX_FIELDS  320
 #define NET_MAX_REMOTE  (MAXPLAYERS - 1)    /* the host plus three joiners */
@@ -215,8 +220,9 @@ int  net_ask(int p, NetAsk kind, int a, int b, int c, const char *text);
  * the action ends his business (NX_ROLL). If not set, only NX_ROLL works. */
 void net_set_action_handler(int (*fn)(Game *g, int p, const NetMsg *m));
 
-/* The Decider for joiners' seats: questions go to their machines; a seat
- * whose player is not connected is played by the computer (medium). */
+/* The Decider for joiners' seats: questions go to their machines. Once a
+ * joiner has left, the few questions still asked for his seat (he holds
+ * nothing and no money) get the computer's harmless answers. */
 extern const Decider net_decider;
 
 /* ---- addresses ---- */

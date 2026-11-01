@@ -337,7 +337,14 @@ int main(int argc, char **argv)
     ncpu = play_hosted(&g, &np, &over);
     CHECK(np == 3 && ncpu == 1, "two humans: %d players, %d computer (want 3, 1)", np, ncpu);
     CHECK(over, "the game with a quitter did not end");
-    CHECK(g.pl[1].cpu, "the quitter's seat was not taken by a computer player");
+    /* Nobody takes a leaver's seat: he is out, holding nothing, and the one
+     * computer player is still the only one. */
+    CHECK(g.pl[1].left && !g.pl[1].cpu, "the quitter did not leave the game (left %d, cpu %d)", g.pl[1].left, g.pl[1].cpu);
+    int held = 0, cpus = 0;
+    for (int sp = 0; sp < NSPACES; sp++) held += g.owner[sp] == 1 || (g.houses[sp] && g.house_owner[sp] == 1);
+    for (int p = 0; p < g.nplayers; p++) cpus += g.pl[p].cpu && !g.pl[p].left;
+    CHECK(held == 0 && g.pl[1].cash == 0, "the quitter still holds %d card(s) and $%d", held, g.pl[1].cash);
+    CHECK(cpus == 1, "%d computer players at the end (want exactly 1)", cpus);
     net_close("Game over.");
     { int st = wait_child(quitter); CHECK(st == 0, "quitter exited %d", st); }
 

@@ -30,9 +30,7 @@
 typedef enum {
     SEAT_EMPTY,             /* nobody: the seat is skipped */
     SEAT_HUMAN,             /* a human at this screen (hot-seat) */
-    SEAT_EASY,              /* computer players */
-    SEAT_MEDIUM,
-    SEAT_HARD,
+    SEAT_COMPUTER,          /* THE computer player: at most one seat, at the game's cpu_skill */
     SEAT_NETWORK,           /* a human on another machine: reserved for network play (net.h) */
     SEAT_KINDS
 } SeatKind;
@@ -51,11 +49,17 @@ typedef struct {
     char net_host[128];     /* the last host joined: [user@]host[:port] */
     int net_port;           /* the port a hosted game listens on (localhost only) */
     char net_command[128];  /* the program ssh runs on the host for the relay */
-    int net_cpu;            /* SEAT_EASY..SEAT_HARD: the computer player in a hosted game */
+    /* The strength of the one computer player (DIFF_EASY..DIFF_HARD), for
+     * games at this screen and hosted games alike: the player who sets up
+     * the game chooses it for everyone. */
+    int cpu_skill;
 } Prefs;
 
-/* The seat's difficulty (DIFF_*) if it is a computer player, else -1. */
-int  prefs_seat_difficulty(int kind);
+/* At most one computer player sits at any table. */
+#define MAX_CPU_PLAYERS 1
+
+/* The number of computer seats. */
+int  prefs_computers(const Prefs *p);
 /* The number of seats that are not empty, and of those that are human. */
 int  prefs_seats_used(const Prefs *p);
 int  prefs_humans(const Prefs *p);

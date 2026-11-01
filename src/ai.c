@@ -46,7 +46,7 @@ static int chance_pct(Game *g, int pct) { return game_random(g, 100) < pct; }
 static double circuits_left(const Game *g)
 {
     int most = 0;
-    for (int q = 0; q < g->nplayers; q++) most = MAX(most, g->pl[q].wages);
+    for (int q = 0; q < g->nplayers; q++) if (game_active(g, q)) most = MAX(most, g->pl[q].wages);
     return MAX(0.75, (double)(g->end_wages - most));
 }
 
@@ -80,7 +80,7 @@ static int unowned_cards(const Game *g)
  * p already holds as extra). */
 static double income_per_circuit(const Game *g, int p, int sp)
 {
-    int opp = g->nplayers - 1;
+    int opp = MAX(1, game_active_count(g) - 1);     /* the others still at the table */
     switch (board[sp].type) {
     case T_LOT:
         if (g->single_tax) return 0;
@@ -108,7 +108,7 @@ static double blocking_value(const Game *g, int p, int sp)
 {
     double best = 0;
     for (int q = 0; q < g->nplayers; q++) {
-        if (q == p) continue;
+        if (q == p || !game_active(g, q)) continue;
         if (board[sp].type == T_RAILROAD) {
             int have = rails_of(g, q);
             if (have >= 2) best = MAX(best, (rail_income(have + 1) - rail_income(have)) * LAND_RATE * 0.5);
@@ -368,7 +368,7 @@ static int ai_raise(Game *g, int p, int need)
         if (g->houses[sp] && !g->single_tax) continue;
         int keep = ai_card_value(g, p, sp);
         for (int q = 0; q < g->nplayers; q++) {         /* another computer player buying it */
-            if (q == p || !g->pl[q].cpu) continue;
+            if (q == p || !g->pl[q].cpu || !game_active(g, q)) continue;
             int offer = ai_offer_for(g, q, sp);
             if (offer <= 0) continue;
             double loss = d == DIFF_HARD ? keep - offer : board[sp].price - offer;
@@ -391,6 +391,7 @@ static void standing(const Game *g, int p, int *now, int *st)
 {
     int best_now = -(1 << 30), best_st = -(1 << 30), me_now = 0, me_st = 0;
     for (int q = 0; q < g->nplayers; q++) {
+        if (!game_active(g, q)) continue;
         int w = game_worth(g, q);
         int ws = w - (g->single_tax ? 0 : 100 * game_cards_of(g, q, T_LOT));
         if (q == p) { me_now = w; me_st = ws; continue; }
@@ -495,7 +496,7 @@ static void maybe_propose(Game *g, int p)
     if (d == DIFF_HARD) go = now > 0 && st < now - 50;
     else if (d == DIFF_MEDIUM) {
         int poorest = 1;
-        for (int q = 0; q < g->nplayers; q++) if (game_worth(g, q) < game_worth(g, p)) poorest = 0;
+        for (int q = 0; q < g->nplayers; q++) if (game_active(g, q) && game_worth(g, q) < game_worth(g, p)) poorest = 0;
         go = poorest && now > 150;
     }
     if (!go) return;

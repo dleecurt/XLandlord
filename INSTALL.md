@@ -65,8 +65,8 @@ A release tarball (`xlandlord-X.Y.Z.tar.gz`) already contains the
 `configure` script, so you only need the build tools from section 1.
 
 ```
-tar xzf xlandlord-0.0.9.tar.gz
-cd xlandlord-0.0.9
+tar xzf xlandlord-0.0.10.tar.gz
+cd xlandlord-0.0.10
 ./configure
 make
 make check            # optional, about 10 seconds, needs no display
@@ -82,7 +82,7 @@ XLandlord
 `configure` ends with a summary, for example:
 
 ```
-  XLandlord 0.0.9 is configured:
+  XLandlord 0.0.10 is configured:
     compiler:        gcc
     X11:             -lX11
     install prefix:  /usr/local
@@ -151,7 +151,7 @@ manager does that).
 | Target | What it does |
 | ------ | ------------ |
 | `make` | Builds `./XLandlord`. |
-| `make check` | Runs the tests (also `make test`). `tests/engine` plays several hundred games between computer players and checks the rules engine and that Hard beats Medium beats Easy; `tests/net` plays whole network games through a stand-in for ssh (the four-player limit, no computer player with four humans, a player dropping out). No display is needed. |
+| `make check` | Runs the tests (also `make test`). `tests/engine` plays several hundred games between computer players and checks the rules engine and that Hard beats Medium beats Easy; `tests/net` plays whole network games through a stand-in for ssh (the four-player limit, no computer player with four humans, a player leaving with nobody taking his seat). No display is needed. |
 | `make install` | Installs everything listed in section 6. |
 | `make uninstall` | Removes it again. |
 | `make pdf` | Rebuilds `docs/xlandlord-rules.pdf` from `docs/RULES.md` (needs pandoc and LaTeX; see section 9). |

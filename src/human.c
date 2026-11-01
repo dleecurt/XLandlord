@@ -276,7 +276,7 @@ int human_choose_sale(Game *g, int p, const char *title, const char *note, int n
         if (g->houses[sp] && !g->single_tax) continue;
         int best = -1, best_price = 0;
         for (int q = 0; q < g->nplayers; q++) {
-            if (q == p || !g->pl[q].cpu) continue;
+            if (q == p || !g->pl[q].cpu || !game_active(g, q)) continue;
             int o = ai_offer_for(g, q, sp);
             if (o > best_price) { best_price = o; best = q; }
         }

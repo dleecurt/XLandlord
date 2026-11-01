@@ -339,7 +339,7 @@ static void draw_tokens(void)
     const Game *g = &app.game;
     for (int sp = 0; sp < NSPACES; sp++) {
         int here[MAXPLAYERS], n = 0;
-        for (int p = 0; p < g->nplayers; p++) if (g->pl[p].pos == sp) here[n++] = p;
+        for (int p = 0; p < g->nplayers; p++) if (g->pl[p].pos == sp && game_active(g, p)) here[n++] = p;
         if (!n) continue;
         UiRect r = space_rect(sp);
         int d = CLAMP(MIN(r.w, r.h) / 4, 10, 18);
@@ -495,6 +495,21 @@ static int draw_player(int p, int x, int y, int w)
     int cur = p == g->cur && !g->over;
     xw_fill(x, y, w, h, cur ? XC_MARK : XC_SURFACE);
     xw_sunken(x, y, w, h);
+    if (P->left) {
+        /* Gone: his name, struck through in gray, and why the box is empty. */
+        char gone[120];
+        int d = lh - 4;
+        xw_circle(x + 9, y + 7, d, XC_TROUGH);
+        snprintf(gone, sizeof gone, "%s", P->name);
+        int tx = x + 15 + d, ty = y + 6 + xw_ascent(XF_UI);
+        xw_clip(x + 4, y + 4, w - 8, h - 8);
+        int tw = xw_text(XF_UI, tx, ty, gone, (int)strlen(gone), XC_TROUGH);
+        xw_hline(tx, ty - xw_ascent(XF_UI) / 3, tw, XC_TROUGH);
+        static const char note[] = "Has left the game; his cards went back into the pack.";
+        xw_text(XF_FIXED, x + 10, y + 8 + lh + xw_ascent(XF_FIXED), note, (int)strlen(note), XC_TROUGH);
+        xw_clip_off();
+        return h;
+    }
     if (cur) xw_box(x + 3, y + 3, w - 6, h - 6, XC_INK);
     int d = lh - 4;
     xw_disc(x + 9, y + 7, d, app_player_color(p));

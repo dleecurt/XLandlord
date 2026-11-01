@@ -29,7 +29,7 @@
 #ifdef PACKAGE_VERSION
 #define PACKAGE_VERSION_STR PACKAGE_VERSION
 #else
-#define PACKAGE_VERSION_STR "0.0.9"
+#define PACKAGE_VERSION_STR "0.0.10"
 #endif
 
 #endif

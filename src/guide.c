@@ -69,9 +69,11 @@ static const Page pages[] = {
       "The same choices are in the Game menu at any time. From a terminal, "
       "XLandlord --host, --join HOST or --local skips the question." },
     { "The New Game form", "new-game",
-      "Each of the four seats is Empty, a Human at this screen, or a "
-      "computer player: Easy, Medium or Hard. You need two players at least, "
-      "and one human.\n\n"
+      "Each of the four seats is Empty, a Human at this screen, or the "
+      "Computer. You need two players at least, and one human; one seat at "
+      "most may be the computer player.\n\n"
+      "Computer skill - Easy, Medium or Hard - is how the computer player "
+      "plays. Whoever sets up the game sets it for everyone.\n\n"
       "Game ends at wages: 5 is the 1906 rule.\n\n"
       "Rules: Standard, or Advanced - the 1906 rules for \"advanced and "
       "scientific players\", where taxes and land rents rise as houses go "
@@ -206,14 +208,17 @@ static const Page pages[] = {
       "to the host with ssh without a password. Help > Network Play and the "
       "manual page (man 6 XLandlord) explain how to set that up.\n\n"
       "When fewer than four humans play, one computer player takes a free "
-      "seat." },
+      "seat, at the skill the host set when he opened the game. Joiners "
+      "have no say in it." },
     { "Who is where", "network-players",
       "In a network game each player's box shows the machine he plays from: "
       "the host's name, or the name of the joiner's machine - or its IP "
       "address when it has no name. \"you\" marks your own seat.\n\n"
       "Everyone sees the same board and dialogs; on your turn the buttons "
-      "work. If a joiner's connection drops, a computer player takes over "
-      "his seat.\n\n"
+      "work.\n\n"
+      "Once the game starts nobody new may join, and the computer player "
+      "stays to the end. A player who leaves is out: his cards go back into "
+      "the pack and nobody takes his seat; his box shows he has left.\n\n"
       "That is the whole game. Help > The Rules of 1906 has the rules in "
       "full, and Help > Keyboard every key.\n\n"
       "To print the rules: the rule book, with screenshots, a board "

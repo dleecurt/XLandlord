@@ -34,15 +34,21 @@ rules and the optional rules
 .RI "for " "advanced and scientific players" .
 .PP
 Two to four players sit at the table. Each seat is a human at this screen
-(players take turns at the keyboard), a computer player at an
+(players take turns at the keyboard), a player on another machine who
+joins over
+.BR ssh (1)
+(see
+.BR "NETWORK PLAY" ),
+or the computer player.
+There is never more than
+.B one
+computer player, and its skill \(em
 .BR Easy ,
 .B Medium
 or
 .B Hard
-level, or a player on another machine who joins over
-.BR ssh (1)
-(see
-.BR "NETWORK PLAY" ).
+\(em is set for the whole game by the player who sets the game up (the
+host of a network game); nobody chooses a skill for himself.
 The window is drawn in the style of the Viola web browser: flat gray94
 panels, raised bevels, black focus boxes, Helvetica menus.
 .PP
@@ -263,8 +269,8 @@ the game uses whatever ssh does.
 .SH NETWORK PLAY
 One player chooses
 .B Host a Network Game
-(at start-up or in the Game menu), picks the computer player's strength,
-the length of the game, the rules and a port (1904 unless that is taken),
+(at start-up or in the Game menu), picks the computer player's skill for
+the game (joiners have no say in it), the length of the game, the rules and a port (1904 unless that is taken),
 and waits in the waiting room. The waiting room shows how to reach the
 host: its host name and its IP addresses.
 .PP
@@ -299,11 +305,17 @@ and the host looks it up in its
 .I /etc/hosts
 and DNS), or its IP address when it has no name.
 .PP
-Four players at most: a fifth is turned away with a warning, and so is
-anyone who tries to join a game already under way. When fewer than four
-humans play, one computer player takes a free seat; with four humans there
-is none. If a joiner's connection drops, a medium computer player takes
-over his seat; if the host leaves, the game ends for everyone.
+Four players at most: a fifth is turned away with a warning. When fewer
+than four humans play, one computer player takes a free seat; with four
+humans there is none, and while the waiting room is open a fourth human
+who joins takes the computer player's seat.
+.PP
+Once the game starts the table is closed: nobody new may join, and the
+computer player stays to the end. A human may leave (or his connection
+drop): he is out of the game, his cards go back into the pack, his houses
+come down, his cash goes with him, and nobody takes his seat; his box shows
+that he has left. If only one player is left, the game is over. If the host
+leaves, the game ends for everyone.
 .\" ------------------------------------------------------------------
 .SH CONFIGURATION
 The game's settings are kept in
@@ -320,12 +332,19 @@ while the game is not running.
 .BR seat1 " .. " seat4
 What sits in each seat of the New Game form:
 .BR empty ,
-.BR human ,
+.B human
+or
+.BR computer .
+A table needs at least two players and one human, and at most one seat
+may be
+.BR computer .
+.TP
+.B cpu_skill
+The computer player's skill, for games at this screen and hosted games:
 .BR easy ,
 .B medium
 or
 .BR hard .
-A table needs at least two players and one human.
 .TP
 .BR name1 " .. " name4
 The names of the human seats.
@@ -378,13 +397,16 @@ The program ssh runs on the host (default
 Give its full path, such as
 .BR /usr/local/bin/XLandlord ,
 when it is not on the PATH that non-interactive ssh sees on the host.
-.TP
+.PP
+Files written by versions up to 0.0.9, with a level for each computer seat
+.RB ( easy ,
+.BR medium ,
+.BR hard )
+and
 .B net_cpu
-The strength of the computer player in a hosted game:
-.BR easy ,
-.B medium
-or
-.BR hard .
+for hosted games, are converted: the first computer seat is kept, the others
+become empty, and its level becomes
+.BR cpu_skill .
 .PP
 A preferences file left by version 0.0.6 or earlier, when the game was
 called Viola the Landlord
@@ -583,7 +605,9 @@ card, which counts 100 at the end;
 .IP \(bu 3
 there is no Poor House: a player who cannot pay rests on the corner behind
 him and draws $50 wages from it before his next throw.
-.SS The computer players
+.SS The computer player
+One computer player at most sits at the table, at the skill chosen when the
+game was set up.
 .B Easy
 plays on impulse: buys about half of what it can afford, seldom bids or
 builds.
@@ -677,7 +701,7 @@ new game / quit
 .PP
 In dialogs Enter presses the button with the focus box, Tab and the arrow
 keys move it, Esc backs out, and an underlined letter presses its button.
-In lists Space ticks a box. While the computer players move, any key
+In lists Space ticks a box. While the computer player moves, any key
 hurries them along.
 .SH FILES
 .TP

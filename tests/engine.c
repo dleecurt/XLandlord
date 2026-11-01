@@ -100,6 +100,48 @@ static int play(int np, const int *diffs, unsigned long seed, int advanced, int 
     return game_leader(&g);
 }
 
+/* A player leaves part-way through (as a network player may): his cards go
+ * back into the pack, his houses come down, his turns are skipped, he is
+ * never the winner, and the game still ends. With two players left the
+ * game goes on; with one it is over. */
+static void leaving(unsigned long seed)
+{
+    static Game g;
+    GameSettings s;
+    memset(&s, 0, sizeof s);
+    s.nplayers = 3;
+    s.end_wages = 5;
+    s.seed = seed;
+    for (int p = 0; p < 3; p++) { s.cpu[p] = 1; s.difficulty[p] = DIFF_MEDIUM; snprintf(s.names[p], NAME_LEN, "P%d", p); }
+    game_new(&g, &s);
+    for (int p = 0; p < 3; p++) game_set_decider(&g, p, &ai_decider);
+    game_deal(&g);
+    for (int t = 0; t < 30 && !g.over; t++) game_turn(&g);
+    game_player_leaves(&g, 1);
+    consistent(&g);
+    int held = 0;
+    for (int sp = 0; sp < NSPACES; sp++) held += g.owner[sp] == 1 || (g.houses[sp] && g.house_owner[sp] == 1);
+    CHECK(held == 0 && g.pl[1].cash == 0, "the leaver still holds %d card(s) and $%d", held, g.pl[1].cash);
+    CHECK(game_active_count(&g) == 2 && !g.over, "two players left: the game should go on");
+    int turns_of_1 = 0;
+    for (int t = 0; t < 5000 && !g.over; t++) {
+        turns_of_1 += g.cur == 1;
+        game_turn(&g);
+        consistent(&g);
+        CHECK(g.pl[1].cash == 0, "the leaver got money back ($%d)", g.pl[1].cash);
+    }
+    CHECK(g.over, "the game with a leaver did not end (seed %lu)", seed);
+    CHECK(turns_of_1 == 0, "the leaver had %d more turn(s)", turns_of_1);
+    CHECK(game_leader(&g) != 1, "the leaver was named the winner");
+    /* Down to one player: over. */
+    game_new(&g, &s);
+    for (int p = 0; p < 3; p++) game_set_decider(&g, p, &ai_decider);
+    game_deal(&g);
+    game_player_leaves(&g, 0);
+    game_player_leaves(&g, 2);
+    CHECK(g.over && game_leader(&g) == 1, "with one player left the game should be over and his");
+}
+
 /* Play `games` two-player games between levels a and b (alternating who
  * starts) and check that a wins more. */
 static void match(const char *title, int a, int b, int games, int advanced)
@@ -138,6 +180,8 @@ int main(int argc, char **argv)
     }
     if (verbose) printf("4-player games under the Single Tax: %d of 100\n", sts);
     CHECK(sts > 0, "the Single Tax never came into force");
+
+    for (unsigned long i = 0; i < 20; i++) leaving(500 + i);
 
     if (failures) { printf("%d check(s) failed\n", failures); return 1; }
     if (verbose) printf("all checks passed\n");

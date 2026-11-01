@@ -120,7 +120,7 @@ static int lobby(void)
             else if (i <= joined) snprintf(row, sizeof row, "%d.  %s  (from %s)", i + 1, net_lobby_name(i - 1),
                                            net_lobby_from(i - 1));
             else if (i == joined + 1) snprintf(row, sizeof row, "%d.  a computer player (%s), unless someone joins", i + 1,
-                                               app.prefs.net_cpu == SEAT_EASY ? "easy" : app.prefs.net_cpu == SEAT_HARD ? "hard" : "medium");
+                                               app.prefs.cpu_skill == DIFF_EASY ? "easy" : app.prefs.cpu_skill == DIFF_HARD ? "hard" : "medium");
             else snprintf(row, sizeof row, "%d.  (open)", i + 1);
             xw_text(XF_UI, list.x + 10, list.y + 4 + i * (lh + 6) + xw_ascent(XF_UI), row, (int)strlen(row), XC_INK);
         }
@@ -161,22 +161,24 @@ static int lobby(void)
  * waiting room. */
 int netui_host_setup(GameSettings *s)
 {
-    static const char *const cpus[] = { "Easy", "Medium", "Hard" };
+    static const char *const cpus[] = { "Easy", "Medium", "Hard" };     /* DIFF_* */
     static const char *const lens[] = { "3", "5", "7", "10" };
     static const char *const rules[] = { "Standard", "Advanced" };
     static const int len_val[] = { 3, 5, 7, 10 };
     UiRow rows[] = {
-        { "Computer player", cpus, 3 },
+        { "Computer skill", cpus, 3 },
         { "Game ends at wages", lens, 4 },
         { "Rules", rules, 2 },
     };
-    int sel[3] = { CLAMP(app.prefs.net_cpu, SEAT_EASY, SEAT_HARD) - SEAT_EASY, 1, app.prefs.advanced };
+    int sel[3] = { CLAMP(app.prefs.cpu_skill, DIFF_EASY, DIFF_HARD), 1, app.prefs.advanced };
     for (int i = 0; i < 4; i++) if (len_val[i] == app.prefs.end_wages) sel[1] = i;
     if (!ui_form("Host a Network Game",
-                 "You host the game; up to three others join from their machines over ssh. One computer player "
-                 "fills a free seat when fewer than four humans play.", rows, 3, sel, "&Open"))
+                 "You host the game and set it up for everyone; up to three others join from their machines "
+                 "over ssh. One computer player, at the skill you choose here, takes a free seat when fewer than "
+                 "four humans play. Once the game starts nobody new can join; a player may leave, and the "
+                 "computer player stays to the end.", rows, 3, sel, "&Open"))
         return 0;
-    app.prefs.net_cpu = SEAT_EASY + sel[0];
+    app.prefs.cpu_skill = sel[0];
     app.prefs.end_wages = len_val[sel[1]];
     app.prefs.advanced = sel[2];
     int port = app.prefs.net_port;
@@ -195,7 +197,7 @@ int netui_host_setup(GameSettings *s)
     memset(s, 0, sizeof *s);
     s->advanced = app.prefs.advanced;
     s->end_wages = app.prefs.end_wages;
-    net_build_table(s, app.prefs.names[0], prefs_seat_difficulty(app.prefs.net_cpu));
+    net_build_table(s, app.prefs.names[0], CLAMP(app.prefs.cpu_skill, DIFF_EASY, DIFF_HARD));
     return 1;
 }
 

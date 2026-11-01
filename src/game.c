@@ -238,13 +238,22 @@ int game_worth(const Game *g, int p)
     return w;
 }
 
-/* See game.h: the player of greatest worth (the first such on a tie). */
+/* See game.h: the player of greatest worth (the first such on a tie),
+ * among those still at the table. */
 int game_leader(const Game *g)
 {
-    int best = 0;
-    for (int p = 1; p < g->nplayers; p++)
-        if (game_worth(g, p) > game_worth(g, best)) best = p;
-    return best;
+    int best = -1;
+    for (int p = 0; p < g->nplayers; p++)
+        if (game_active(g, p) && (best < 0 || game_worth(g, p) > game_worth(g, best))) best = p;
+    return best < 0 ? 0 : best;
+}
+
+/* See game.h. */
+int game_active_count(const Game *g)
+{
+    int n = 0;
+    for (int p = 0; p < g->nplayers; p++) n += game_active(g, p);
+    return n;
 }
 
 /* See game.h: an estimate for the computer players of what a stop on sp
@@ -291,7 +300,7 @@ static void transfer(Game *g, int from, int to, int amount)
     }
 }
 
-static void collect(Game *g, int p, int amount) { g->pl[p].cash += amount; }
+static void collect(Game *g, int p, int amount) { if (!g->pl[p].left) g->pl[p].cash += amount; }
 
 /* Has p anything left to sell to raise money? */
 static int has_assets(const Game *g, int p)
@@ -328,7 +337,8 @@ static void broke(Game *g, int p)
 static int charge(Game *g, int p, int amount, int to)
 {
     Player *P = &g->pl[p];
-    if (amount <= 0) return 1;
+    if (amount <= 0 || P->left) return 1;          /* one who has left owes nothing */
+    if (to >= 0 && g->pl[to].left) return 1;       /* nor is anything owed to him */
     for (int guard = 0; P->cash < amount && guard < 64; guard++) {
         if (!has_assets(g, p) || !g->dec[p]->raise(g, p, amount - P->cash)) break;
     }
@@ -394,7 +404,7 @@ int game_propose_single_tax(Game *g, int p)
     int votes = 1;
     game_log(g, "%s proposes the Single Tax.", nm(g, p));
     for (int q = 0; q < g->nplayers; q++) {
-        if (q == p) continue;
+        if (q == p || !game_active(g, q)) continue;
         int yes = g->dec[q]->vote_single_tax(g, q, p);
         game_log(g, "  %s votes %s.", nm(g, q), yes ? "for it" : "against it");
         votes += yes;
@@ -467,6 +477,7 @@ void game_deal(Game *g)
             for (int j = i; j > 0 && mine[j - 1] > mine[j]; j--) { int t = mine[j]; mine[j] = mine[j - 1]; mine[j - 1] = t; }
         memset(want, 0, sizeof want);
         g->dec[p]->deal_buy(g, p, mine, m, want);
+        if (!game_active(g, p)) continue;       /* left during the deal */
         int bought = 0;
         for (int i = 0; i < m; i++) {
             if (!want[i] || g->pl[p].cash < board[mine[i]].price) continue;
@@ -488,7 +499,7 @@ static int offer(Game *g, int p, int sp)
     int price = board[sp].price;
     int best = NOBODY, best_max = price, second = price;
     for (int q = 0; q < g->nplayers; q++) {
-        if (q == p || g->pl[q].cash <= price) continue;
+        if (q == p || !game_active(g, q) || g->pl[q].cash <= price) continue;
         int m = MIN(g->dec[q]->max_bid(g, q, sp, price + 5), g->pl[q].cash);
         if (m <= price) continue;
         if (m > best_max) { second = best_max; best_max = m; best = q; }
@@ -496,7 +507,7 @@ static int offer(Game *g, int p, int sp)
     }
     int high = best == NOBODY ? price : MIN(best_max, MAX(second, price) + 5);
     if (best != NOBODY) game_log(g, "%s bids $%d for %s.", nm(g, best), high, board[sp].name);
-    if (g->pl[p].cash >= high && g->dec[p]->buy(g, p, sp, high, best)) {
+    if (game_active(g, p) && g->pl[p].cash >= high && g->dec[p]->buy(g, p, sp, high, best)) {
         take_card(g, p, sp, high);
         return p;
     }
@@ -792,11 +803,11 @@ static void draw_chance(Game *g, int p, int depth)
     case CH_PER_HOUSE: charge(g, p, c->amount * game_houses_of(g, p), TO_TREASURY); break;
     case CH_PER_LOT:   collect(g, p, c->amount * game_cards_of(g, p, T_LOT)); break;
     case CH_FROM_EACH:
-        for (int q = 0; q < g->nplayers; q++) if (q != p) charge(g, q, c->amount, p);
+        for (int q = 0; q < g->nplayers; q++) if (q != p && game_active(g, q)) charge(g, q, c->amount, p);
         stop_turn = 0;              /* another player's trouble does not end this turn */
         break;
     case CH_TO_EACH:
-        for (int q = 0; q < g->nplayers && !stop_turn; q++) if (q != p) charge(g, p, c->amount, q);
+        for (int q = 0; q < g->nplayers && !stop_turn; q++) if (q != p && game_active(g, q)) charge(g, p, c->amount, q);
         break;
     }
 }
@@ -860,12 +871,54 @@ static void land(Game *g, int p, int from, int n, int depth)
 
 /* ---- the turn ---- */
 
+/* See game.h. */
+void game_player_leaves(Game *g, int p)
+{
+    if (p < 0 || p >= g->nplayers || g->pl[p].left) return;
+    Player *P = &g->pl[p];
+    int cards = 0, houses = 0;
+    for (int i = 0; i < NSPACES; i++) {
+        /* Houses he built come down (under the Single Tax he may have built
+         * on lots he does not hold); so do houses on his lots. */
+        if (g->houses[i] && (g->house_owner[i] == p || (g->owner[i] == p && g->house_owner[i] == NOBODY))) {
+            houses += g->houses[i];
+            g->houses[i] = 0;
+            g->house_owner[i] = NOBODY;
+        }
+        if (g->owner[i] == p) {
+            g->owner[i] = NOBODY;
+            cards++;
+        }
+    }
+    if (in_trust(g, p)) {
+        game_log(g, "The railroad Trust is dissolved.");
+        g->trust_a = g->trust_b = -1;
+    }
+    g->trust_refused = 0;
+    P->left = 1;
+    P->cash = 0;
+    P->in_jail = P->in_poorhouse = P->natural_opp = 0;
+    P->luxuries = P->education = P->professors = 0;
+    game_log(g, "%s has left the game; %d card%s go%s back into the pack%s.", nm(g, p), cards,
+             cards == 1 ? "" : "s", cards == 1 ? "es" : "", houses ? " and his houses come down" : "");
+    if (p == g->cur) stop_turn = 1;
+    if (!g->over && game_active_count(g) < 2) {
+        g->over = 1;
+        game_log(g, "Only one player is left at the table: the game is over.");
+    }
+    if (g->hooks.changed) g->hooks.changed(g);
+}
+
 void game_turn(Game *g)
 {
     if (g->over) return;
     int p = g->cur;
     Player *P = &g->pl[p];
     stop_turn = 0;
+    if (P->left) {                      /* (normally skipped when the dice pass on) */
+        g->cur = (g->cur + 1) % g->nplayers;
+        return;
+    }
 
     if (P->in_poorhouse) {
         P->in_poorhouse = 0;
@@ -878,13 +931,16 @@ void game_turn(Game *g)
     }
     check_trust(g);
     if (g->dec[p]->pre_roll) g->dec[p]->pre_roll(g, p);
+    if (P->left || g->over) goto done;      /* he left while making up his mind */
 
     int d1, d2;
     if (P->in_jail) {
         P->jail_turns++;
         int must = P->jail_turns >= 3;  /* "He cannot ... miss more than three turns" */
         int can = P->cash >= 50 || has_assets(g, p);
-        if (can && (must || g->dec[p]->jail_pay(g, p))) {
+        int pay = can && (must || g->dec[p]->jail_pay(g, p));
+        if (P->left) goto done;
+        if (pay) {
             game_log(g, "%s pays the $50 fine and leaves Jail.", nm(g, p));
             if (!charge(g, p, 50, TO_TREASURY)) goto done;
             P->in_jail = 0;
@@ -905,13 +961,16 @@ void game_turn(Game *g)
 
 done:
     g->turn_no++;
-    for (int q = 0; q < g->nplayers; q++) {
-        if (g->pl[q].wages >= g->end_wages) {
+    for (int q = 0; q < g->nplayers && !g->over; q++) {
+        if (game_active(g, q) && g->pl[q].wages >= g->end_wages) {
             g->over = 1;
             game_log(g, "%s has received his wages %d times: the game is over.", nm(g, q), g->end_wages);
             break;
         }
     }
     pause_here(g, p);
-    if (!g->over) g->cur = (g->cur + 1) % g->nplayers;
+    if (!g->over) {
+        /* The dice pass to the next player still at the table. */
+        do g->cur = (g->cur + 1) % g->nplayers; while (g->pl[g->cur].left && g->cur != p);
+    }
 }
