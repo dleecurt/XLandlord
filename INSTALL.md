@@ -65,8 +65,8 @@ A release tarball (`xlandlord-X.Y.Z.tar.gz`) already contains the
 `configure` script, so you only need the build tools from section 1.
 
 ```
-tar xzf xlandlord-0.0.8.tar.gz
-cd xlandlord-0.0.8
+tar xzf xlandlord-0.0.9.tar.gz
+cd xlandlord-0.0.9
 ./configure
 make
 make check            # optional, about 10 seconds, needs no display
@@ -82,7 +82,7 @@ XLandlord
 `configure` ends with a summary, for example:
 
 ```
-  XLandlord 0.0.8 is configured:
+  XLandlord 0.0.9 is configured:
     compiler:        gcc
     X11:             -lX11
     install prefix:  /usr/local
@@ -230,7 +230,23 @@ the system's `ssh` program. At run time:
   net_command = /home/lee/.local/bin/XLandlord
   ```
 
-## 9. Rebuilding the rules PDF
+## 9. The rules PDF
+
+`make install` puts the rule book, `xlandlord-rules.pdf`, in the documents
+directory (`/usr/local/share/doc/xlandlord/` by default, or wherever
+`--docdir` says), with its Markdown source `RULES.md` and its pictures. The
+game's Help > The Rules of 1906 and the man page give that path. To read or
+print it:
+
+```
+xdg-open /usr/local/share/doc/xlandlord/xlandlord-rules.pdf
+lp /usr/local/share/doc/xlandlord/xlandlord-rules.pdf
+```
+
+Its last page is a one-page quick reference, handy to print on its own
+(`lp -P 18 ...`).
+
+### Rebuilding it
 
 `docs/xlandlord-rules.pdf` is generated from `docs/RULES.md` and comes
 ready-made with the source, so you never need to build it to play or install.

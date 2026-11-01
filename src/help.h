@@ -22,6 +22,13 @@
 #ifndef HELP_H
 #define HELP_H
 
+/* The installed documents (make passes the configured docdir); the rule
+ * book PDF is shown to the player by name in the Help texts. */
+#ifndef DOCDIR
+#define DOCDIR "/usr/local/share/doc/xlandlord"
+#endif
+#define RULEBOOK_PDF DOCDIR "/xlandlord-rules.pdf"
+
 extern const char *const help_rules[];
 extern const char *const help_history[];
 extern const char *const help_keys[];

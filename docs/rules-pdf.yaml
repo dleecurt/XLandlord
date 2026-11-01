@@ -9,7 +9,7 @@ toc-depth: 1
 number-sections: false
 metadata:
   subtitle: "Lizzie J. Magie's game of 1904, by the rules of 1906, for X11"
-  author: "XLandlord 0.0.8"
+  author: "XLandlord 0.0.9"
   date: "2026"
 variables:
   documentclass: article

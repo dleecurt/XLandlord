@@ -29,6 +29,9 @@
 # INSTALL.md describes all of these.
 
 AM_CFLAGS = $(WARN_CFLAGS) $(X11_CFLAGS)
+# Where `make install` puts the documents, so the Help texts can say where
+# the rule book PDF is (see src/help.h).
+AM_CPPFLAGS = -DDOCDIR='"$(docdir)"'
 
 bin_PROGRAMS = XLandlord
 

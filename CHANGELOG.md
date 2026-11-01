@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.0.9 - 2026-10-31
+
+- The printable rule book, `xlandlord-rules.pdf`, stays: it is built and
+  installed as before, and the man page (THE RULE BOOK (PDF)), Help > The
+  Rules of 1906, the last page of Help > How to Play, README, INSTALL and
+  the rule book itself say where it is installed and how to view, print
+  and rebuild it. The program is told the installed path (`DOCDIR`).
+
 ## 0.0.8 - 2026-10-31
 
 - A full manual page, `man 6 XLandlord`, installed with the game: the

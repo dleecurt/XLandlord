@@ -47,7 +47,8 @@ The window is drawn in the style of the Viola web browser: flat gray94
 panels, raised bevels, black focus boxes, Helvetica menus.
 .PP
 This page covers installing and setting up the game, its preferences, and
-the complete rules.
+the complete rules; the printable rule book is described under
+.BR "THE RULE BOOK (PDF)" .
 .B Help > How to Play
 (F1) in the game is an illustrated guide to the same rules; the rule book
 .I RULES.md
@@ -592,6 +593,45 @@ plays by rules of thumb, keeping $100 in hand.
 counts: it values each card by the rent it should bring, keeps in hand what
 a trip round the board is likely to cost, chases railroad monopolies and
 blocks yours, and votes on the Single Tax by what it does to its standing.
+.\" ------------------------------------------------------------------
+.SH THE RULE BOOK (PDF)
+The rules above are also printed in the rule book,
+.IR xlandlord\-rules.pdf ,
+which adds screenshots of every step, a numbered map of the board, the
+history of the game and Lizzie Magie, and a one-page quick reference (the
+last page). It ships with the source in
+.I docs/
+and
+.B make install
+puts it in the documentation directory, normally
+.IR /usr/local/share/doc/xlandlord/xlandlord\-rules.pdf ,
+next to its Markdown source
+.IR RULES.md .
+.PP
+To read or print it:
+.PP
+.RS
+.nf
+xdg\-open /usr/local/share/doc/xlandlord/xlandlord\-rules.pdf
+lp /usr/local/share/doc/xlandlord/xlandlord\-rules.pdf
+.fi
+.RE
+.PP
+or open it in any PDF viewer
+.RB ( evince ,
+.BR okular ,
+.BR xpdf ,
+.BR mupdf ).
+After editing
+.IR docs/RULES.md ,
+.B make pdf
+in the build directory rebuilds it; that needs
+.BR pandoc (1)
+and a LaTeX engine
+.RB ( pdflatex ),
+which
+.B configure
+looks for. Without them the shipped PDF is used as it is.
 .\" ------------------------------------------------------------------
 .SH PLAYING AT THE SCREEN
 On your turn the

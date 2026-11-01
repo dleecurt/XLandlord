@@ -44,7 +44,12 @@ installed where, uninstalling, network-play requirements and troubleshooting.
 **[docs/RULES.md](docs/RULES.md)** is the complete rule book and how-to-play
 guide, with screenshots, a numbered board map and a quick-reference page; the
 same document is in **[docs/xlandlord-rules.pdf](docs/xlandlord-rules.pdf)**
-for printing. Both are installed in `$(prefix)/share/doc/xlandlord`.
+for printing. Both are installed in `$(prefix)/share/doc/xlandlord`. The
+PDF (18 pages, its last a one-page quick reference) is the one to print:
+`xdg-open /usr/local/share/doc/xlandlord/xlandlord-rules.pdf`, or
+`lp` the same file. `make pdf` rebuilds it after editing `docs/RULES.md`
+(see [INSTALL.md](INSTALL.md), section 9). Help > The Rules of 1906 and
+`man 6 XLandlord` say where it is installed.
 
 **The manual page**, `man 6 XLandlord`, is installed with the game. It holds
 everything in one place: the command line, building and installing, setting
@@ -64,7 +69,7 @@ arrow keys) turn the pages.
 
 Without the 75dpi fonts the game still runs; X picks the nearest fonts it has.
 
-Current version: **0.0.8** (see `CHANGELOG.md`).
+Current version: **0.0.9** (see `CHANGELOG.md`).
 
 ## Playing
 

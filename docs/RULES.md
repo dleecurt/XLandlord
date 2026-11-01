@@ -3,10 +3,14 @@
 *Lizzie J. Magie's game of 1904, by the rules of 1906, with the Single Tax,
 for one to four players at one screen or over the network.*
 
-XLandlord 0.0.8. Copyright (C) 2026 Lee Curtis. This document is
+XLandlord 0.0.9. Copyright (C) 2026 Lee Curtis. This document is
 part of the program and is free under the GNU General Public License,
 version 3 or later; the rules it describes are those of the public-domain 1904
 patent and 1906 rule book.
+
+This rule book is installed as `xlandlord-rules.pdf` (to print) and
+`RULES.md` in the game's documents directory, normally
+`/usr/local/share/doc/xlandlord/`.
 
 In the program, Help > How to Play (F1) gives the same guide in short, a
 page at a time with screenshots, and `man 6 XLandlord` gives the rules

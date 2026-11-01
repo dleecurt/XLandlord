@@ -34,6 +34,7 @@
 
 #include "guide.h"
 #include "guidepics.h"
+#include "help.h"
 #include "keys.h"
 #include "ui.h"
 #include "util.h"
@@ -214,7 +215,11 @@ static const Page pages[] = {
       "work. If a joiner's connection drops, a computer player takes over "
       "his seat.\n\n"
       "That is the whole game. Help > The Rules of 1906 has the rules in "
-      "full, and Help > Keyboard every key." },
+      "full, and Help > Keyboard every key.\n\n"
+      "To print the rules: the rule book, with screenshots, a board "
+      "map and a one-page quick reference, is installed as " RULEBOOK_PDF
+      ". Open it with any PDF viewer. The manual page (man 6 XLandlord) "
+      "has the rules too, with installation and setup." },
 };
 #define NPAGES ((int)(sizeof pages / sizeof pages[0]))
 
@@ -361,8 +366,8 @@ void guide_show(void)
         else if (k == '\n' || k == '\r' || k == ' ') press = focus;
         else if (k == K_RIGHT || k == K_PGDN) press = 1;
         else if (k == K_LEFT || k == K_PGUP || k == K_BACKSPACE) press = 0;
-        else if (k == K_HOME) { page = 0; top = 0; continue; }
-        else if (k == K_END)  { page = NPAGES - 1; top = 0; continue; }
+        else if (k == K_HOME) { page = 0; top = 0; focus = 1; continue; }
+        else if (k == K_END)  { page = NPAGES - 1; top = 0; focus = 2; continue; }
         else if (k == K_UP)   { top--; continue; }
         else if (k == K_DOWN) { top++; continue; }
         else if (k == '\t')   { focus = (focus + 1) % 3; continue; }
