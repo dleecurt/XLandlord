@@ -3,10 +3,14 @@
 *Lizzie J. Magie's game of 1904, by the rules of 1906, with the Single Tax,
 for one to four players at one screen or over the network.*
 
-XLandlord 0.0.7. Copyright (C) 2026 Lee Curtis. This document is
+XLandlord 0.0.8. Copyright (C) 2026 Lee Curtis. This document is
 part of the program and is free under the GNU General Public License,
 version 3 or later; the rules it describes are those of the public-domain 1904
 patent and 1906 rule book.
+
+In the program, Help > How to Play (F1) gives the same guide in short, a
+page at a time with screenshots, and `man 6 XLandlord` gives the rules
+together with installation and setup.
 
 ## Contents
 
@@ -550,7 +554,7 @@ connection runs inside ssh.
 | T | buy a card from another player |
 | S | sell a card to another player |
 | X | propose the Single Tax |
-| F1 | how to play (in the program) |
+| F1 | how to play: the illustrated guide |
 | F2 | the standings |
 | Page Up, Page Down, End | scroll the record of events; End returns to the newest |
 | Esc, F9, F10 | the menu bar; Alt+G, Alt+O, Alt+H open a menu |

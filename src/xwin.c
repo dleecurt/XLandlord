@@ -264,6 +264,80 @@ void xw_picture(int x, int y, const char *const *rows, int scale, int color, int
     }
 }
 
+/* ---- full-color pictures ---- */
+
+#define MAX_IMAGES 32
+static Pixmap images[MAX_IMAGES];           /* decoded pictures, by handle */
+static int image_w[MAX_IMAGES], image_h[MAX_IMAGES], nimages;
+
+/* The server's pixel for an 0xRRGGBB color, remembered between calls
+ * (black if the colormap is full). */
+static unsigned long rgb_pixel(unsigned long rgb)
+{
+    static unsigned long seen_rgb[128], seen_pixel[128];
+    static int nseen;
+    for (int i = 0; i < nseen; i++) if (seen_rgb[i] == rgb) return seen_pixel[i];
+    XColor c;
+    c.red = (unsigned short)(((rgb >> 16) & 0xff) * 257);
+    c.green = (unsigned short)(((rgb >> 8) & 0xff) * 257);
+    c.blue = (unsigned short)((rgb & 0xff) * 257);
+    c.flags = DoRed | DoGreen | DoBlue;
+    unsigned long pixel = XAllocColor(dpy, DefaultColormap(dpy, scr), &c) ? c.pixel : BlackPixel(dpy, scr);
+    if (nseen < 128) { seen_rgb[nseen] = rgb; seen_pixel[nseen] = pixel; nseen++; }
+    return pixel;
+}
+
+/* See xwin.h: runs are drawn as rectangles, split where they wrap a row. */
+int xw_image_new(int w, int h, const unsigned long *palette, int ncolors,
+                 const unsigned char *rle, size_t size)
+{
+    if (nimages == MAX_IMAGES || w <= 0 || h <= 0 || ncolors <= 0 || ncolors > 256) return -1;
+    unsigned long pix[256];
+    for (int i = 0; i < ncolors; i++) pix[i] = rgb_pixel(palette[i]);
+    Pixmap pm = XCreatePixmap(dpy, win, (unsigned)w, (unsigned)h, (unsigned)depth);
+    GC g = XCreateGC(dpy, pm, 0, NULL);
+    XSetForeground(dpy, g, pixels[XC_SURFACE]);
+    XFillRectangle(dpy, pm, g, 0, 0, (unsigned)w, (unsigned)h);
+    long pos = 0, total = (long)w * h;
+    int last = -1;
+    for (size_t i = 0; i < size && pos < total; ) {
+        int color = rle[i++];
+        unsigned long len = 0;
+        int shift = 0;
+        while (i < size) {
+            unsigned b = rle[i++];
+            len |= (unsigned long)(b & 0x7f) << shift;
+            shift += 7;
+            if (!(b & 0x80)) break;
+        }
+        long run = (long)len + 1;
+        if (color >= ncolors) color = 0;
+        if (color != last) { XSetForeground(dpy, g, pix[color]); last = color; }
+        while (run > 0 && pos < total) {
+            int x = (int)(pos % w), y = (int)(pos / w);
+            int n = (int)MIN(run, (long)(w - x));
+            XFillRectangle(dpy, pm, g, x, y, (unsigned)n, 1);
+            pos += n;
+            run -= n;
+        }
+    }
+    XFreeGC(dpy, g);
+    images[nimages] = pm;
+    image_w[nimages] = w;
+    image_h[nimages] = h;
+    return nimages++;
+}
+
+/* See xwin.h. */
+void xw_image_draw(int id, int sx, int sy, int w, int h, int x, int y)
+{
+    if (id < 0 || id >= nimages) return;
+    w = MIN(w, image_w[id] - sx);
+    h = MIN(h, image_h[id] - sy);
+    if (w <= 0 || h <= 0) return;
+    XCopyArea(dpy, images[id], back, gc, sx, sy, (unsigned)w, (unsigned)h, x, y);
+}
+
 /* See xwin.h. */
 void xw_clip(int x, int y, int w, int h)
 {
@@ -440,6 +514,8 @@ void xw_close(void)
         if (fonts[i] && !dup) XFreeFont(dpy, fonts[i]);
     }
     if (back) XFreePixmap(dpy, back);
+    for (int i = 0; i < nimages; i++) XFreePixmap(dpy, images[i]);
+    nimages = 0;
     if (icon_pixmap) XFreePixmap(dpy, icon_pixmap);
     if (icon_mask) XFreePixmap(dpy, icon_mask);
     XFreeGC(dpy, gc);

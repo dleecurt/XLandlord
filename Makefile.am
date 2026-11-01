@@ -44,6 +44,8 @@ CORE_SOURCES = \
 XLandlord_SOURCES = \
 	$(CORE_SOURCES) \
 	src/art.c \
+	src/guide.c \
+	src/guidepics.c \
 	src/help.c \
 	src/human.c \
 	src/main.c \
@@ -58,6 +60,8 @@ XLandlord_LDADD = $(X11_LIBS)
 noinst_HEADERS = \
 	src/ai.h \
 	src/app.h \
+	src/guide.h \
+	src/guidepics.h \
 	src/art.h \
 	src/board.h \
 	src/game.h \
@@ -78,7 +82,7 @@ man_MANS = XLandlord.6
 
 EXTRA_DIST = XLandlord.6.in COPYING autogen.sh .gitignore \
 	$(desktop_DATA) $(ICON_PNGS) icons/xlandlord.svg icons/xlandlord.xpm \
-	$(PDF_SOURCES) docs/images/board-map.svg
+	$(PDF_SOURCES) docs/images/board-map.svg $(GUIDE_PICS) docs/guidepics.c
 
 # ---- documents ----
 # Installed into $(docdir), normally $(prefix)/share/doc/xlandlord: the
@@ -126,6 +130,49 @@ pdf:
 	@echo "The shipped docs/xlandlord-rules.pdf is up to date with this release."
 endif
 .PHONY: pdf
+
+# ---- the How to Play screenshots ----
+# Help > How to Play shows the pictures in docs/guide/*.png, compiled into
+# the program as src/guidepics.c, which ships ready-made. After changing a
+# picture, `make guide-pics` remakes it (it needs ImageMagick's convert).
+GUIDE_PICS = \
+	docs/guide/title.png \
+	docs/guide/start-up.png \
+	docs/guide/new-game.png \
+	docs/guide/the-deal.png \
+	docs/guide/your-turn.png \
+	docs/guide/which-way.png \
+	docs/guide/railroad-pass.png \
+	docs/guide/for-sale.png \
+	docs/guide/bidding.png \
+	docs/guide/board-corner.png \
+	docs/guide/chance.png \
+	docs/guide/speculation.png \
+	docs/guide/jail.png \
+	docs/guide/houses.png \
+	docs/guide/trade.png \
+	docs/guide/single-tax-vote.png \
+	docs/guide/single-tax.png \
+	docs/guide/standings.png \
+	docs/guide/waiting-room.png \
+	docs/guide/network-players.png
+EXTRA_PROGRAMS += docs/guidepics
+docs_guidepics_SOURCES = docs/guidepics.c
+docs_guidepics_CFLAGS = $(WARN_CFLAGS)
+CLEANFILES += docs/guidepics$(EXEEXT)
+
+guide-pics: docs/guidepics$(EXEEXT)
+	@command -v convert >/dev/null 2>&1 || { echo "make guide-pics needs ImageMagick (convert)"; exit 1; }
+	@tmp=`mktemp -d` && args= && \
+	for p in $(GUIDE_PICS); do \
+	    n=`basename $$p .png`; \
+	    convert "$(srcdir)/$$p" -depth 8 "ppm:$$tmp/$$n.ppm" || exit 1; \
+	    args="$$args $$n=$$tmp/$$n.ppm"; \
+	done; \
+	./docs/guidepics$(EXEEXT) $$args > "$(srcdir)/src/guidepics.c.new" && \
+	mv "$(srcdir)/src/guidepics.c.new" "$(srcdir)/src/guidepics.c"; \
+	st=$$?; rm -rf "$$tmp"; exit $$st
+.PHONY: guide-pics
 
 # ---- desktop ----
 # The menu entry and the icon (a house on a lot over a title deed, pixel art

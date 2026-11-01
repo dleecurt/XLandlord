@@ -33,6 +33,7 @@
 
 #include "ai.h"
 #include "app.h"
+#include "guide.h"
 #include "help.h"
 #include "human.h"
 #include "keys.h"
@@ -807,7 +808,7 @@ static void run_command(Command c)
     case CMD_SPEED:         cmd_speed(); break;
     case CMD_TOGGLE_BIDS:   app.prefs.ask_bids = !app.prefs.ask_bids; prefs_save(&app.prefs); break;
     case CMD_TOGGLE_CONFIRM: app.prefs.confirm_cpu = !app.prefs.confirm_cpu; prefs_save(&app.prefs); break;
-    case CMD_HELP_PLAY:     ui_info_box("How to Play", help_play); break;
+    case CMD_HELP_PLAY:     guide_show(); break;
     case CMD_HELP_RULES:    ui_info_box("The Rules of 1906", help_rules); break;
     case CMD_HELP_HISTORY:  ui_info_box("Lizzie Magie and the Game", help_history); break;
     case CMD_HELP_NETWORK:  ui_info_box("Network Play", help_network); break;

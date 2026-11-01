@@ -39,6 +39,9 @@ int ui_hit(UiRect r, int x, int y)
 
 static int title_height(void) { return xw_line_height(XF_UI) + 12; }
 
+/* See ui.h. */
+int ui_title_height(void) { return title_height(); }
+
 static int is_enter(int k) { return k == '\n' || k == '\r'; }
 
 /* See ui.h: draw the game, then an empty dialog panel with its title;
@@ -227,8 +230,8 @@ void ui_message(const char *title, const char *text)
     ui_ask(title, text, ok, 1, 0, 0);
 }
 
-/* A thin Viola scroll bar (trough and thumb). */
-static void mini_scrollbar(int x, int y, int h, int top, int rows, int n)
+/* See ui.h: a thin Viola scroll bar (trough and thumb). */
+void ui_scrollbar(int x, int y, int h, int top, int rows, int n)
 {
     if (n <= rows) return;
     xw_fill(x, y, 12, h, XC_TROUGH);
@@ -259,7 +262,7 @@ void ui_info_box(const char *title, const char *const *lines)
         for (int i = 0; i < rows && top + i < n; i++)
             xw_text(XF_FIXED, c.x, c.y + i * lh + xw_ascent(XF_FIXED), lines[top + i], (int)strlen(lines[top + i]), XC_INK);
         xw_clip_off();
-        if (scroll) mini_scrollbar(c.x + c.w - 12, c.y, rows * lh, top, rows, n);
+        if (scroll) ui_scrollbar(c.x + c.w - 12, c.y, rows * lh, top, rows, n);
         UiRect ok = { c.x + c.w - UI_BUTTON_W, c.y + c.h - UI_BUTTON_H, UI_BUTTON_W, UI_BUTTON_H };
         ui_button(ok, "OK", 1);
         xw_flush();
@@ -339,7 +342,7 @@ static void draw_list(const char *title, const char *note, const char *const *it
         xw_text(XF_UI, tx, iy + (ih - lh) / 2 + xw_ascent(XF_UI), items[k], (int)strlen(items[k]), XC_INK);
     }
     xw_clip_off();
-    if (scroll) mini_scrollbar(c.x + c.w - 12, list.y, list.h, *top, rows, n);
+    if (scroll) ui_scrollbar(c.x + c.w - 12, list.y, list.h, *top, rows, n);
     if (footer)
         xw_text(XF_UI, c.x, list.y + list.h + 6 + xw_ascent(XF_UI), footer, (int)strlen(footer), XC_INK);
     UiRect b[2];

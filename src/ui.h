@@ -64,6 +64,14 @@ void ui_message(const char *title, const char *text);
 /* A long text (lines, NULL-terminated) in the fixed font, scrollable, OK. */
 void ui_info_box(const char *title, const char *const *lines);
 
+/* A thin Viola scroll bar, 12 pixels wide and h tall at (x, y), for a list
+ * of n rows showing `rows` of them from `top`; nothing if all fit. */
+void ui_scrollbar(int x, int y, int h, int top, int rows, int n);
+
+/* The height of a dialog's title (with its etched line), for laying out
+ * dialogs made with ui_frame. */
+int ui_title_height(void);
+
 /* Choose one of n items from a list. Returns the index or -1. */
 int ui_choose(const char *title, const char *note, const char *const *items, int n, int initial);
 

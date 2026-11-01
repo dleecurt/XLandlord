@@ -1,19 +1,26 @@
-.\" XLandlord - The Landlord's Game for X11
+.\" XLandlord(6) - The Landlord's Game for X11
 .\" Copyright (C) 2026 Lee Curtis
 .\" SPDX-License-Identifier: GPL-3.0-or-later
+.\"
+.\" The manual page: what the program is, how to build, install and set it
+.\" up (network play over ssh included), its preferences file, and the full
+.\" rules of the game as XLandlord plays them. Made into XLandlord.6 by
+.\" configure (the version number is filled in) and installed by `make install'.
+.\"
+.\" .TS / tbl is not used, so the page reads the same with any man(1).
 .TH XLANDLORD 6 "2026" "XLandlord @VERSION@" "Games"
 .SH NAME
-XLandlord \- The Landlord's Game (Lizzie J. Magie, 1904) against the computer, for X11
+XLandlord \- The Landlord's Game (Lizzie J. Magie, 1904) for X11, against the computer or over the network
 .SH SYNOPSIS
 .B XLandlord
 .RB [ \-\-host " | " \-\-join
-.IR host " | "
-.BR \-\-local ]
+.RI [ user\fB@\fP] host [\fB:\fP port ]
+.RB " | " \-\-local ]
 .br
 .B XLandlord
-.RB [ \-\-version " | " \-\-help ]
+.BR \-\-version " | " \-\-help
 .br
-.B viola\-landlord \-\-relay
+.B XLandlord \-\-relay
 .I port
 .SH DESCRIPTION
 .B XLandlord
@@ -23,94 +30,582 @@ the board game patented by Lizzie J. Magie in 1904 (US Patent 748,626)
 and the ancestor of Monopoly, by the rules published by the Economic Game
 Company of New York in 1906, including the
 .B Single Tax
-rules. Two to four players sit at the table: each seat is a human at this
-screen (players take turns at the keyboard) or a computer player at an
+rules and the optional rules
+.RI "for " "advanced and scientific players" .
+.PP
+Two to four players sit at the table. Each seat is a human at this screen
+(players take turns at the keyboard), a computer player at an
 .BR Easy ,
 .B Medium
 or
 .B Hard
-level. Players on other machines can join over
-.BR ssh (1);
-see NETWORK PLAY. The window is drawn in the style of the Viola web browser: flat
-gray94 panels, raised bevels, black focus boxes, Helvetica menus.
+level, or a player on another machine who joins over
+.BR ssh (1)
+(see
+.BR "NETWORK PLAY" ).
+The window is drawn in the style of the Viola web browser: flat gray94
+panels, raised bevels, black focus boxes, Helvetica menus.
 .PP
-The game ends when a player has drawn his wages five times (three, seven or
-ten can be chosen); the richest player wins, counting cash and 100 for each
-card, house and luxury.
+This page covers installing and setting up the game, its preferences, and
+the complete rules.
+.B Help > How to Play
+(F1) in the game is an illustrated guide to the same rules; the rule book
+.I RULES.md
+and
+.I xlandlord\-rules.pdf
+add screenshots, a numbered board map and the history of the game.
 .SH OPTIONS
-At start-up the game asks whether to host a network game, join one, or play
-at this screen. These options skip the question:
+At start-up the game asks whether to
+.BR "Host a Network Game" ,
+.BR "Join a Network Game" ,
+or
+.BR "Play Here" .
+These options skip the question:
 .TP
 .B \-\-host
-host a network game.
+Host a network game (see
+.BR "NETWORK PLAY" ).
 .TP
-.BI \-\-join " host"
-join the game hosted on
+.BI \-\-join " \fR[\fPuser\fB@\fP\fR]\fPhost\fR[\fP\fB:\fPport\fR]\fP"
+Join the game hosted on
 .IR host :
-an IP address (IPv4 or IPv6) or a host name found in DNS or
-.IR /etc/hosts ,
-optionally with
+an IPv4 or IPv6 address, or a host name found in DNS or
+.IR /etc/hosts .
 .IB user @
-in front and
+logs in to the host as another user;
 .BI : port
-after it (an IPv6 address with a port in brackets,
-.BR [2001:db8::5]:1905 ).
+is needed only when the host chose a port other than 1904. Write an IPv6
+address with a port in brackets:
+.BR [2001:db8::5]:1905 .
 .TP
 .B \-\-local
-play at this screen, against the computer or hot-seat.
-.SH PLAYING
-On your turn press
-.B Roll Dice
-(Space or Enter). Whenever the rules give you a choice \(em buying a lot,
-bidding, paying the jail fine, using a railroad pass, moving backward
-between the Chances, speculating, buying a luxury \(em a dialog asks.
-Before rolling you may build houses, buy or sell cards, or propose the
-Single Tax from the
-.B Game
-menu. Click a space on the board to read about it.
+Play at this screen, against the computer or with others taking turns.
+.TP
+.B \-\-version
+Print the version and exit.
+.TP
+.B \-\-help
+Print a short usage message and exit.
+.TP
+.BI \-\-relay " port"
+Run by ssh on the host for network play, never by hand: connect standard
+input and output to the game hosted on this machine at
+.BI 127.0.0.1: port\fR.
+.\" ------------------------------------------------------------------
+.SH INSTALLATION
+XLandlord is written in C99 with plain Xlib. To build it you need a C
+compiler,
+.BR make (1),
+and the X11 development headers and libraries
+.RB ( libx11\-dev
+on Debian and Ubuntu,
+.B libX11\-devel
+on Fedora,
+.B libx11
+on Arch; part of the X sets on NetBSD). The X server needs its standard
+fonts
+.RB ( xfonts\-base ,
+.BR xfonts\-75dpi ).
+.PP
+From a release tarball:
+.PP
+.RS
+.nf
+tar xzf xlandlord\-@VERSION@.tar.gz
+cd xlandlord\-@VERSION@
+\&./configure
+make
+make check          # optional: the rules engine and network tests
+sudo make install
+.fi
+.RE
+.PP
+From a git checkout, run
+.B ./autogen.sh
+first (it needs autoconf and automake). Useful
+.B configure
+options:
+.TP
+.BI \-\-prefix= dir
+Install under
+.I dir
+instead of
+.IR /usr/local .
+.B \-\-prefix=$HOME/.local
+installs for yourself only, without root.
+.TP
+.BI \-\-docdir= dir
+Where the documents go (default
+.IR prefix /share/doc/xlandlord ).
+.PP
+.B make install
+puts the program in
+.IR prefix /bin/XLandlord,
+this manual page in
+.IR prefix /share/man/man6/XLandlord.6,
+a menu entry in
+.IR prefix /share/applications/xlandlord.desktop,
+icons under
+.IR prefix /share/icons/hicolor
+and
+.IR prefix /share/pixmaps,
+and
+.IR README.md ,
+.IR INSTALL.md ,
+.IR RULES.md ,
+.I xlandlord\-rules.pdf
+and the rule book's pictures in the documentation directory.
+.B make uninstall
+removes them all again. The game can also be run without installing it:
+.B ./XLandlord
+in the build directory.
+.PP
+.I INSTALL.md
+has the full guide: packages for each system, every make target, and
+troubleshooting.
+.\" ------------------------------------------------------------------
+.SH SETTING UP NETWORK PLAY
+Network play runs over ssh. Every machine needs the same version of
+XLandlord installed, and each player who joins must be able to log in to
+the host with
+.B ssh
+.I without typing a password
+(the game runs ssh with
+.BR BatchMode=yes ,
+so ssh never stops to ask). The game does not set this up; the usual way is:
+.IP 1. 4
+On the host, run an ssh server
+.RB ( "sudo apt install openssh\-server"
+on Debian and Ubuntu;
+.B sshd=YES
+in
+.I /etc/rc.conf
+on NetBSD).
+.IP 2. 4
+On each joiner's machine, make a key pair if there is none:
+.RS
+.IP
+.B ssh\-keygen \-t ed25519
+.RE
+.IP
+Press Enter for an empty passphrase, or choose one and load the key into
+.BR ssh\-agent (1)
+with
+.BR ssh\-add (1)
+before playing.
+.IP 3. 4
+Install the public key on the host (this asks for the host password one
+last time):
+.RS
+.IP
+.B ssh\-copy\-id
+.IB user @ host
+.RE
+.IP
+Without
+.BR ssh\-copy\-id ,
+append
+.I ~/.ssh/id_ed25519.pub
+to
+.I ~/.ssh/authorized_keys
+on the host.
+.IP 4. 4
+Log in once with a plain
+.B ssh
+.IB user @ host
+to accept the host's key, then check that this prints the version without
+asking anything:
+.RS
+.IP
+.B ssh \-o BatchMode=yes
+.IB user @ host
+.B XLandlord \-\-version
+.RE
+.PP
+If step 4 fails:
+.TP
+.B Permission denied
+The key is not in the host's
+.IR ~/.ssh/authorized_keys ,
+or the permissions are too open: on the host,
+.B chmod 700 ~/.ssh
+and
+.BR "chmod 600 ~/.ssh/authorized_keys" .
+.TP
+.B Host key verification failed
+Log in once with a plain
+.BR ssh .
+.TP
+.B command not found
+Non-interactive ssh does not see the host's PATH (for instance
+.IR /usr/local/bin ).
+Fix the PATH for non-interactive shells on the host, or set
+.B net_command
+to the program's full path on the host in the joiner's preferences (see
+.BR CONFIGURATION ).
+.PP
+To join by host name, the joiner's machine must find the name in DNS or in
+.IR /etc/hosts ,
+for example
+.PP
+.RS
+.B 192.168.1.20   gamebox
+.RE
+.PP
+or the joiner types the host's IP address instead. A different ssh user,
+port or key for the host goes in a
+.B Host
+entry in the joiner's
+.IR ~/.ssh/config ;
+the game uses whatever ssh does.
+.\" ------------------------------------------------------------------
 .SH NETWORK PLAY
 One player chooses
-.BR "Game > Host a Network Game" ;
-up to three others choose
-.B "Game > Join a Network Game"
-and give the host's IP address or host name,
+.B Host a Network Game
+(at start-up or in the Game menu), picks the computer player's strength,
+the length of the game, the rules and a port (1904 unless that is taken),
+and waits in the waiting room. The waiting room shows how to reach the
+host: its host name and its IP addresses.
+.PP
+Up to three others choose
+.B Join a Network Game
+and type the host's address,
 .RI [ user\fB@\fP] host [\fB:\fP port ].
-A name is looked up in DNS and
-.I /etc/hosts
-(the system resolver); one found in neither is reported before ssh is
-started. The host's waiting room shows its name and IP addresses.
-Next to each player's name the game shows his machine: the host's own
-name, or for a joiner the name of the machine his ssh connection came from
-(taken from ssh's
-.B SSH_CONNECTION
-by the relay and looked up in the host's
-.I /etc/hosts
-and DNS), or its IP address if it has no name.
-The joiner's game runs
+A name is looked up first, in DNS and
+.IR /etc/hosts ;
+one found in neither is reported
+.RB ( "Host Not Found" )
+before ssh is started. The joiner's game then runs
 .PP
 .RS
 .B ssh \-T \-o BatchMode=yes
-.I user\fB@\fPhost
-.B viola\-landlord \-\-relay
+.IB user @ host
+.B XLandlord \-\-relay
 .I port
 .RE
 .PP
-and the relay connects to the hosting game, which listens on 127.0.0.1 only
-(port 1904 unless the host chose another). Four players at most: a fifth is
-turned away with a warning. When fewer than four humans play, one computer
-player takes a free seat; with four humans there is none. A joiner whose
-connection drops is replaced by a computer player.
+and the relay connects to the hosting game, which listens on 127.0.0.1
+only. The host runs the only real game; joiners see the same board and the
+same dialogs, and on their turn the buttons work. When everyone is in, the
+host presses
+.BR "Start Game" .
 .PP
-Password-less ssh (a key, e.g.
-.B ssh\-keygen
-then
-.BR ssh\-copy\-id )
-is required; check it with
-.BR "ssh \-o BatchMode=yes user@host viola\-landlord \-\-version" .
+Next to each player's name the game shows his machine: the host's own host
+name, or for a joiner the name of the machine his ssh connection came from
+(the relay reads the address from ssh's
+.B SSH_CONNECTION
+and the host looks it up in its
+.I /etc/hosts
+and DNS), or its IP address when it has no name.
+.PP
+Four players at most: a fifth is turned away with a warning, and so is
+anyone who tries to join a game already under way. When fewer than four
+humans play, one computer player takes a free seat; with four humans there
+is none. If a joiner's connection drops, a medium computer player takes
+over his seat; if the host leaves, the game ends for everyone.
+.\" ------------------------------------------------------------------
+.SH CONFIGURATION
+The game's settings are kept in
+.I $XDG_CONFIG_HOME/xlandlord/preferences.conf
+(normally
+.IR ~/.config/xlandlord/preferences.conf ),
+written whenever a setting is changed in the game. It holds
+.I key " = " value
+lines; lines starting with
+.B #
+are comments, and unknown keys are ignored. The file may be edited by hand
+while the game is not running.
 .TP
-.BI \-\-relay " port"
-(run by ssh on the host, not by hand) connect standard input and output to
-the game hosted on this machine.
+.BR seat1 " .. " seat4
+What sits in each seat of the New Game form:
+.BR empty ,
+.BR human ,
+.BR easy ,
+.B medium
+or
+.BR hard .
+A table needs at least two players and one human.
+.TP
+.BR name1 " .. " name4
+The names of the human seats.
+.TP
+.B end_wages
+How many times a player draws his wages before the game ends:
+.BR 3 ,
+.B 5
+(the 1906 rule, the default),
+.B 7
+or
+.BR 10 .
+.TP
+.B advanced
+.B 1
+for the advanced and scientific rules,
+.B 0
+for the standard rules.
+.TP
+.B ask_bids
+.B 1
+to be asked for a bid when another player stops on an unowned card
+(Options > Ask Me to Bid),
+.B 0
+not to bid.
+.TP
+.B confirm_cpu
+.B 1
+to wait for a key after every computer move (Options > Confirm Each
+Computer Move).
+.TP
+.B speed
+The pause after each computer move:
+.B 0
+fast,
+.B 1
+normal,
+.B 2
+slow (Options > Computer Speed).
+.TP
+.B net_host
+The last host joined, offered again by Join a Network Game.
+.TP
+.B net_port
+The port to host on (default 1904).
+.TP
+.B net_command
+The program ssh runs on the host (default
+.BR XLandlord ).
+Give its full path, such as
+.BR /usr/local/bin/XLandlord ,
+when it is not on the PATH that non-interactive ssh sees on the host.
+.TP
+.B net_cpu
+The strength of the computer player in a hosted game:
+.BR easy ,
+.B medium
+or
+.BR hard .
+.PP
+A preferences file left by version 0.0.6 or earlier, when the game was
+called Viola the Landlord
+.RI ( ~/.config/viola\-landlord/preferences.conf ),
+is read once and saved under the new name.
+.\" ------------------------------------------------------------------
+.SH THE RULES
+These are the rules of 1906 as XLandlord plays them. Rule numbers are
+those of the 1906 rule sheet.
+.SS The object
+Get as much wealth as you can. The game ends when one player has drawn his
+wages five times (or the number chosen), and the richest player wins.
+Wealth is counted as your cash, plus
+.B 100
+for every card you hold (title deeds, railroad and franchise charters, the
+broker's license) whatever you paid for it, plus 100 for every house you
+built, every luxury card, and every Professor card (Single Tax only).
+A lot bought for $25 is thus worth $75 more than it cost before it collects
+a single rent.
+.SS Starting
+Every player starts on MOTHER EARTH with $600 if two play, $500 if three,
+$400 if four.
+.SS The deal (Rule 1)
+The cards are shuffled and dealt round, one at a time, until 24 have been
+dealt or the pack is empty (there are 23 cards). Each player may buy any of
+the cards dealt to him at its price; the money goes into the PUBLIC
+TREASURY. Cards not bought go back into the pack. The rules advise keeping
+$50 to $75 for expenses around the board.
+.SS A turn
+Before throwing you may build houses, buy or sell cards, or propose the
+Single Tax. Then throw two dice and move forward that many spaces, except:
+.TP
+.B Between the Chances (Rule 2)
+On one of the six spaces between the Chance at 32 and the Chance at 39 you
+may move backward instead.
+.TP
+.B The railroad pass (Rule 17)
+A double is an official pass on the railroad: if the throw carries you past
+the next corner you may jump the nine spaces to the following corner,
+finishing nine spaces further on. You may decline it.
+.TP
+.B Refusing to speculate (Rule 8)
+If the throw would bring you onto SPECULATION you may refuse to move.
+.PP
+.B Wages (Rule 3):
+each time you reach or pass MOTHER EARTH you draw $100.
+Several players may stand on one space; each pays what it calls for.
+.SS The board
+Forty spaces: four corners and nine on each side, played from MOTHER EARTH
+(bottom right) right to left along the bottom, up the left side, across the
+top and down the right side. A railroad stands in the middle of each side.
+.PP
+The lots, with price and land rent:
+.PP
+.RS
+.nf
+.ta 4n 26n 34n
+ 1	Lonely Lane	$25	$2
+ 3	Goat Alley	$50	$4
+ 6	The Pike	$25	$2
+ 8	Market Place	$50	$4
+ 9	Cottage Terrace	$50	$6
+12	Boomtown	$50	$6
+14	Beggarman's Court	$50	$6
+17	Easy Street	$75	$8
+19	The Bowery	$75	$10
+23	Fairhope Avenue	$75	$10
+26	George Street	$75	$12
+28	Madison Square	$100	$14
+31	Grand Boulevard	$100	$16
+33	Wall Street	$100	$18
+36	Broadway	$100	$20
+38	Fifth Avenue	$100	$22
+.fi
+.RE
+.PP
+The other cards cost $50 each: the railroads (P.D.Q. R.R. at 5, Gee Whiz
+R.R. at 15, Shooting Star R.R. at 25, Royal Rusher R.R. at 35), the
+franchises (Soakum Lighting System at 16, Slambang Trolley at 22) and the
+broker's license (Speculation, at 21).
+.PP
+The other spaces: the four
+.B Absolute Necessities
+(Food, Shelter, Fuel, Clothing) charge a $10 tax; at
+.B Lord Blueblood's Estate
+and
+.B D. F. Hogg's Game Preserves
+you are trespassing and go to Jail;
+.B Chance
+draws a card;
+.B Luxury
+sells a luxury;
+.B Legacy
+pays you $100;
+.B Central Park
+is free; stopping on
+.B Jail
+or the
+.B Poor House
+is only a visit.
+.SS Buying, bidding and rent (Rule 7)
+When you stop on a lot, railroad or franchise owned by another player, you
+pay him its land rent (plus $10 for each house on it), or its fare or
+charge. If nobody owns it, it is for sale at its price and the other
+players may bid more, in $5 steps. You have the first option, at the
+highest bid (or at the price if nobody bid). If you do not buy and somebody
+bid, he buys it and you pay him the rent at once; if nobody bid, nobody
+buys it, and you pay its land rent (or $5 for a railroad or franchise) into
+the Public Treasury.
+.SS Railroads and franchises (Rule 9)
+Each stop by another player pays the owner $5 for one railroad; $10 on each
+when he owns two (a MONOPOLY); $20 on each for three; $50 on each for all
+four. A franchise pays $5; both franchises (the MUNICIPAL CINCH) pay $25
+each. If two players own all four railroads between them they may pool them
+in a
+.BR TRUST :
+every fare becomes $40, the partners divide the profits and ride free on
+each other's lines. A trust breaks up when a railroad changes hands.
+.SS Taxes, Chance, Luxury, Legacy (Rules 4, 11, 13)
+The Absolute Necessities charge $10 each, paid into the Public Treasury.
+.PP
+A
+.B Chance
+card is drawn from a pack of sixteen and put back afterwards. They pay you
+$25, $30, $50 or $100, $5 a lot you own, or $10 from every other player;
+cost you $10, $25 or $50, $10 a house, or $10 to every other player; or move
+you to Jail, to Mother Earth (with wages), to Central Park, to the next
+railroad (paying the fare), or back three spaces. Money paid goes into the
+Public Treasury.
+.PP
+At a
+.B Luxury
+pay $75 for a luxury card, which counts 100 at the end. If you will not or
+cannot, move backward from where the throw began, as far as you threw, and
+settle that space instead.
+.SS Speculation (Rule 8)
+If nobody holds the broker's license it is first offered for sale. You pay
+a $10 ante to the broker (to the bank if there is none) and throw again:
+any double wins $100; 11 wins $90, 10 $80, 9 $70, 8 $60, 7 $50, 6 $40,
+5 $30; 3 or 4 is a
+.I skin game
+and wins nothing. The broker takes 10% of your winnings; on a skin game he
+is caught, goes to Jail, and his license goes back to the pack.
+.SS Jail (Rules 5 and 6)
+Trespassing, or the Chance card that says so, sends you to Jail and ends
+your turn. On each later turn either pay the $50 fine and throw as usual,
+or throw for a double: a double lets you out and you move by it. On the
+third turn the fine is paid for you. You leave Jail counting from Shelter.
+.SS Raising money and the Poor House (Rule 12)
+When you owe more than you have you must sell: a card to a computer player
+at his offer, a card back to the pack for half its price, or a house to the
+bank for $50 (houses go before the lot under them). If you cannot pay and
+have nothing left to sell, you pay what you have and go to the Poor House
+until your next turn.
+.SS Houses (Rule 14)
+Before throwing you may build on your own lots. A house costs $100, adds
+$10 to the lot's rent, and counts 100 at the end. Up to nine houses stand
+on a lot (three under the advanced rules).
+.SS Trading (Rule 16)
+All cards may be bought, sold and traded between players before a throw. A
+computer player accepts an offer that beats what the card is worth to it;
+a human is asked to accept or decline. Lots with houses cannot change hands
+until the houses are sold.
+.SS The end (Rule 19)
+The game ends at the end of the turn in which a player draws his wages for
+the last time. The final standings list each player's cash, cards, houses,
+luxuries and worth; the richest player is the winner.
+.SS The advanced and scientific rules
+With 10 houses on the board the tax on each Absolute Necessity is $20, with
+25 houses $40. The corners and railroads divide the board into eight
+sections of four spaces; when every lot in a section has a house its land
+rents double, at two houses each they double again, at three again. At most
+three houses stand on a lot.
+.SS The Single Tax
+At any time in his turn a player may propose the Single Tax; it comes into
+force with the votes of at least two players (his own and one more). Then
+title deeds to lots are worth nothing, and:
+.IP \(bu 3
+there are no taxes on the Absolute Necessities;
+.IP \(bu 3
+all land rent goes into the Public Treasury, which starts empty; an owner
+of houses on the lot still collects $10 a house, and an unimproved lot may
+be built on by whoever stops there;
+.IP \(bu 3
+railroad fares and franchise charges are paid to their owners until the
+public buys them;
+.IP \(bu 3
+every $50 in the Treasury is spent for the public, in order: Soakum
+Lighting, Slambang Trolley, the four railroads (each bought from its owner
+for $50 and then free), a free college on Lord Blueblood's Estate and one
+on Hogg's Game Preserves (no more Jail there), and after that $10 more
+wages for every $50;
+.IP \(bu 3
+stopping at a free college gives an Education card; four make a Professor
+card, which counts 100 at the end;
+.IP \(bu 3
+there is no Poor House: a player who cannot pay rests on the corner behind
+him and draws $50 wages from it before his next throw.
+.SS The computer players
+.B Easy
+plays on impulse: buys about half of what it can afford, seldom bids or
+builds.
+.B Medium
+plays by rules of thumb, keeping $100 in hand.
+.B Hard
+counts: it values each card by the rent it should bring, keeps in hand what
+a trip round the board is likely to cost, chases railroad monopolies and
+blocks yours, and votes on the Single Tax by what it does to its standing.
+.\" ------------------------------------------------------------------
+.SH PLAYING AT THE SCREEN
+On your turn the
+.B Roll Dice
+button has the black focus box; press it, Space or Enter. Whenever the
+rules give you a choice \(em buying a lot, bidding, paying the jail fine,
+using the pass, moving backward, speculating, buying a luxury \(em a dialog
+asks. Build, Trade and the Single Tax are in the
+.B Game
+menu and on the buttons. Click a space on the board to read about it.
+When several humans share the screen, a
+.B Pass the game to ...
+prompt appears between their turns, and every question names the player
+it is for.
 .SH KEYS
 .TP
 .BR Space ", " Enter ", " R
@@ -120,13 +615,13 @@ roll the dice
 build a house
 .TP
 .BR T " / " S
-buy a card from, or sell a card to, a computer player
+buy a card from, or sell a card to, another player
 .TP
 .B X
 propose the Single Tax
 .TP
 .B F1
-how to play
+how to play (the illustrated guide)
 .TP
 .B F2
 the standings
@@ -139,44 +634,56 @@ the menu bar; Alt+G, Alt+O, Alt+H open a menu
 .TP
 .BR Ctrl+N " / " Ctrl+Q
 new game / quit
+.PP
+In dialogs Enter presses the button with the focus box, Tab and the arrow
+keys move it, Esc backs out, and an underlined letter presses its button.
+In lists Space ticks a box. While the computer players move, any key
+hurries them along.
 .SH FILES
 .TP
-.I $XDG_CONFIG_HOME/xlandlord/preferences.conf
-(normally
-.IR ~/.config/xlandlord/preferences.conf )
-the seats
-.RI ( seat1 " .. " seat4 :
-empty, human, easy, medium, hard), the human players' names
-.RI ( name1 " .. " name4 ),
-the length of the game, the rules, the options, and for network play
-.IR net_host ,
-.IR net_port ,
-.I net_command
-(the program ssh runs on the host; give a full path if it is not on the
-host's PATH for non-interactive ssh) and
-.IR net_cpu ,
-as
-.I key = value
-lines.
+.I ~/.config/xlandlord/preferences.conf
+The preferences (see
+.BR CONFIGURATION ).
+.TP
+.I /usr/local/share/doc/xlandlord/
+The rule book
+.RI ( RULES.md ,
+.IR xlandlord\-rules.pdf ),
+.I README.md
+and
+.IR INSTALL.md .
 .SH ENVIRONMENT
 .TP
 .B DISPLAY
-the X display to use.
+The X display to use.
+.TP
+.B XDG_CONFIG_HOME
+Where the preferences folder lives (default
+.IR ~/.config ).
+.TP
+.B SSH_CONNECTION
+Set by sshd for the relay; tells the host which machine a joiner comes
+from.
+.TP
+.B XLANDLORD_SSH
+For testing: a program to run instead of
+.BR ssh .
 .SH NOTES
-The board is drawn after the layout of Magie's 1904 patent drawing; the
-rules are those of the patent and of 1906. Both are in the public domain.
-All pictures are original to this program. The exact order of some spaces,
-the land rent of each lot and the Chance cards are not given by the
-surviving 1906 rule text and are reconstructed; see README.md.
+The board follows the layout of Magie's 1904 patent drawing, and the rules
+are those of the patent and of 1906; both are in the public domain. The
+exact order of some spaces, the land rents and the Chance cards are not
+given by the surviving rule text and are reconstructed; see
+.I README.md
+and section 20 of the rule book. Every picture in the program is original
+pixel art.
 .SH SEE ALSO
-The rule book and how-to-play guide,
-.I RULES.md
-and
-.IR viola\-landlord\-rules.pdf ,
-and the build guide
-.IR INSTALL.md ,
-in the documentation directory (normally
-.IR /usr/local/share/doc/viola\-landlord ).
+.BR ssh (1),
+.BR ssh\-keygen (1),
+.BR ssh\-copy\-id (1),
+.BR hosts (5),
+.BR X (7)
+.PP
+The project: <https://github.com/dleecurt/XLandlord>
 .SH AUTHOR
 Lee Curtis.
 .SH COPYRIGHT

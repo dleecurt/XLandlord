@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.0.8 - 2026-10-31
+
+- A full manual page, `man 6 XLandlord`, installed with the game: the
+  command line, building and installing, setting up password-less ssh for
+  network play, every preferences key, playing at the screen, keys, and the
+  complete rules of 1906 with the advanced rules and the Single Tax.
+- Help > How to Play (F1) is now an illustrated guide: twenty pages, each a
+  screenshot from the game with a short explanation, turned with Back /
+  Next or the arrow keys. The window fits the screen; text that does not
+  fit scrolls.
+- The screenshots are compiled into the program (`src/guidepics.c`, about
+  350 KB), made from `docs/guide/*.png` by `docs/guidepics.c`;
+  `make guide-pics` remakes them.
+- The man page no longer mentions the old program name.
+
 ## 0.0.7 - 2026-10-31
 
 - The game is now called **XLandlord** (it was "Viola the Landlord"), and

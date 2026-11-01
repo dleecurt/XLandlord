@@ -22,7 +22,6 @@
 #ifndef HELP_H
 #define HELP_H
 
-extern const char *const help_play[];
 extern const char *const help_rules[];
 extern const char *const help_history[];
 extern const char *const help_keys[];

@@ -65,8 +65,8 @@ A release tarball (`xlandlord-X.Y.Z.tar.gz`) already contains the
 `configure` script, so you only need the build tools from section 1.
 
 ```
-tar xzf xlandlord-0.0.7.tar.gz
-cd xlandlord-0.0.7
+tar xzf xlandlord-0.0.8.tar.gz
+cd xlandlord-0.0.8
 ./configure
 make
 make check            # optional, about 10 seconds, needs no display
@@ -82,7 +82,7 @@ XLandlord
 `configure` ends with a summary, for example:
 
 ```
-  XLandlord 0.0.7 is configured:
+  XLandlord 0.0.8 is configured:
     compiler:        gcc
     X11:             -lX11
     install prefix:  /usr/local
@@ -155,6 +155,7 @@ manager does that).
 | `make install` | Installs everything listed in section 6. |
 | `make uninstall` | Removes it again. |
 | `make pdf` | Rebuilds `docs/xlandlord-rules.pdf` from `docs/RULES.md` (needs pandoc and LaTeX; see section 9). |
+| `make guide-pics` | Remakes `src/guidepics.c`, the screenshots compiled into Help > How to Play, from `docs/guide/*.png` (needs ImageMagick). Only needed after changing a picture; the generated file ships with the source. |
 | `make clean` | Removes what `make` built. |
 | `make distclean` | Also removes what `configure` made. |
 | `make dist` | Makes `xlandlord-X.Y.Z.tar.gz`, ready to build anywhere. |

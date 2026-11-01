@@ -46,6 +46,16 @@ guide, with screenshots, a numbered board map and a quick-reference page; the
 same document is in **[docs/xlandlord-rules.pdf](docs/xlandlord-rules.pdf)**
 for printing. Both are installed in `$(prefix)/share/doc/xlandlord`.
 
+**The manual page**, `man 6 XLandlord`, is installed with the game. It holds
+everything in one place: the command line, building and installing, setting
+up password-less ssh for network play, every preferences key, and the full
+rules of the game.
+
+**In the game**, Help > How to Play (F1) is an illustrated guide: twenty
+pages, each with a screenshot and a short explanation, from starting a game
+through bidding, Jail and the Single Tax to network play. Back / Next (or the
+arrow keys) turn the pages.
+
 | System        | Build                           | Fonts (to look like Viola)                  |
 | ------------- | ------------------------------- | ------------------------------------------- |
 | Debian/Ubuntu | `sudo apt install libx11-dev`   | `sudo apt install xfonts-base xfonts-75dpi` |
@@ -54,7 +64,7 @@ for printing. Both are installed in `$(prefix)/share/doc/xlandlord`.
 
 Without the 75dpi fonts the game still runs; X picks the nearest fonts it has.
 
-Current version: **0.0.7** (see `CHANGELOG.md`).
+Current version: **0.0.8** (see `CHANGELOG.md`).
 
 ## Playing
 
@@ -337,6 +347,11 @@ Only public-domain material or art made for this program is used:
 | `src/xwin.c` | the only module that talks to X |
 | `src/art.c` | the pictures |
 | `src/help.c` | the Help texts |
+| `src/guide.c` | Help > How to Play, the illustrated guide |
+| `src/guidepics.c` | its screenshots, compiled in (made by `make guide-pics`) |
+| `docs/guide/*.png` | the guide's screenshots, the source of `src/guidepics.c` |
+| `docs/guidepics.c` | turns them into `src/guidepics.c` |
+| `XLandlord.6.in` | the manual page |
 | `src/prefs.c` | the preferences file |
 | `src/main.c` | start-up, the main loop, the commands |
 | `tests/engine.c` | `make check`: computer-only games and consistency checks |

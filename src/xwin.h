@@ -41,6 +41,8 @@
 #ifndef XWIN_H
 #define XWIN_H
 
+#include <stddef.h>
+
 enum {
     /* The Viola design system's palette. */
     XC_SURFACE,         /* gray94: every pane, menu and button */
@@ -93,6 +95,15 @@ void xw_polygon(const int *xy, int npoints, int color);         /* filled */
  * `color2` (-1: skipped), anything else is transparent. Each character is
  * drawn as a scale x scale square. */
 void xw_picture(int x, int y, const char *const *rows, int scale, int color, int color2);
+/* A full-color picture (a screenshot): `palette` holds 0xRRGGBB colors and
+ * `rle` the runs over the w x h pixels, row after row, each a palette index
+ * byte and then the run length less one in 7-bit groups, lowest first, the
+ * top bit set on all but the last (see docs/guidepics.c). It is decoded
+ * once into a server pixmap; returns a handle for xw_image_draw, or -1. */
+int  xw_image_new(int w, int h, const unsigned long *palette, int ncolors,
+                  const unsigned char *rle, size_t size);
+/* Draw the w x h part of image `id` that starts at (sx, sy) at (x, y). */
+void xw_image_draw(int id, int sx, int sy, int w, int h, int x, int y);
 
 int  xw_text(int font, int x, int y, const char *s, int n, int color);
 int  xw_text_width(int font, const char *s, int n);
