@@ -267,6 +267,10 @@ static void start_network_game(void)
     begin(g);
 }
 
+/* Set while the New Game form opens straight after the start-up name
+ * prompt, so seat 1 is not asked its name a second time. */
+static int own_name_just_given;
+
 /* The settings form: who sits where, the computer player's skill, the
  * length and the rules. One seat at most may be the computer player, and
  * its skill is set here for the whole game. Returns 1 if confirmed (and
@@ -317,6 +321,7 @@ static int settings_form(const char *title, const char *ok)
     /* Names for the human seats (Enter keeps the one shown). */
     for (int i = 0; i < NSEATS; i++) {
         if (app.prefs.seat[i] != SEAT_HUMAN) continue;
+        if (i == 0 && own_name_just_given && app.prefs.names[0][0]) continue;  /* just asked */
         char name[32], note[80];
         copy_str(name, sizeof name, app.prefs.names[i]);
         snprintf(note, sizeof note, "The name of the human player in seat %d:", i + 1);
@@ -775,8 +780,35 @@ static void cmd_net_join(void)
  * --local) and skips the question; `join_host` is --join's host. */
 typedef enum { START_ASK, START_HOST, START_JOIN, START_LOCAL } StartMode;
 
+/* See main.c's start_up: the player's name in the game, asked at every
+ * start (the one used last time is filled in; Enter keeps it). It is the
+ * player's identity at this screen and in network games, and has nothing
+ * to do with the system's user name (which only ssh uses). An empty name
+ * is asked again; Cancel returns 0. */
+static int ask_own_name(void)
+{
+    for (;;) {
+        char name[32];
+        copy_str(name, sizeof name, app.prefs.names[0]);
+        if (!ui_prompt("Your Name", "What is your name in the game? It is shown to the other players and "
+                       "used in network games (it need not be your login name).", name, sizeof name))
+            return 0;
+        /* Trim spaces at both ends; '|' separates fields on the network. */
+        char *s = name;
+        while (*s == ' ' || *s == '\t') s++;
+        for (char *e = s + strlen(s); e > s && (e[-1] == ' ' || e[-1] == '\t'); ) *--e = '\0';
+        for (char *q = s; *q; q++) if (*q == '|') *q = '/';
+        if (!*s) { ui_message("Your Name", "Please type a name to play under."); continue; }
+        copy_str(app.prefs.names[0], sizeof app.prefs.names[0], s);
+        prefs_save(&app.prefs);
+        return 1;
+    }
+}
+
 static void start_up(StartMode mode, const char *join_host)
 {
+    /* Who is playing: asked before anything else, every time. */
+    if (!ask_own_name()) { quit_requested = 1; return; }
     if (mode == START_ASK) {
         static const char *const b[] = { "&Host a Network Game", "&Join a Network Game", "&Play Here", "&Quit" };
         int i = ui_ask("XLandlord",
@@ -793,7 +825,11 @@ static void start_up(StartMode mode, const char *join_host)
     switch (mode) {
     case START_HOST:  start_network_game(); break;
     case START_JOIN:  netui_join(join_host); break;
-    default:          cmd_new_game(); break;
+    default:
+        own_name_just_given = 1;
+        cmd_new_game();
+        own_name_just_given = 0;
+        break;
     }
 }
 

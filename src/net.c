@@ -29,6 +29,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/time.h>
@@ -613,6 +614,18 @@ static void greet(int c, const char *line)
     if (humans_seated() >= MAXPLAYERS) {
         event("%s was turned away: the table is full (four players).%s", conns[c].name, "");
         refuse(c, FULL_MESSAGE);
+        return;
+    }
+    /* Names are what players are known by at the table (not their login
+     * names), so no two may be the same. */
+    int taken = !strcasecmp(conns[c].name, host_name[0] ? host_name : "Host");
+    for (int i = 0; i < nlobby; i++) if (!strcasecmp(conns[lobby[i]].name, conns[c].name)) taken = 1;
+    if (taken) {
+        char why[200];
+        event("%s was turned away: that name is already taken.%s", conns[c].name, "");
+        snprintf(why, sizeof why, "Someone at this table is already called %s. Join again with another name.",
+                 conns[c].name);
+        refuse(c, why);
         return;
     }
     if (!lobby_open) {

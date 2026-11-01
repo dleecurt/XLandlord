@@ -60,7 +60,9 @@ static const Page pages[] = {
       "single rent.\n\n"
       "Use Next (or the Right arrow) to turn the page." },
     { "Starting", "start-up",
-      "When XLandlord starts it asks how you want to play.\n\n"
+      "When XLandlord starts it first asks your name - the name you play "
+      "under, shown to everyone and used in network games (not your login "
+      "name). Then it asks how you want to play.\n\n"
       "Host a Network Game: you run the game and up to three players join "
       "from their own machines.\n\n"
       "Join a Network Game: you play in a game someone else is hosting.\n\n"

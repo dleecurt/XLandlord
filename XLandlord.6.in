@@ -62,7 +62,10 @@ and
 .I xlandlord\-rules.pdf
 add screenshots, a numbered board map and the history of the game.
 .SH OPTIONS
-At start-up the game asks whether to
+At start-up the game first asks the player's name in the game: the name
+shown to the other players and used in network games. It is never taken
+from the login name; the name used last time is filled in. Then it asks
+whether to
 .BR "Host a Network Game" ,
 .BR "Join a Network Game" ,
 or
@@ -305,6 +308,11 @@ and the host looks it up in its
 .I /etc/hosts
 and DNS), or its IP address when it has no name.
 .PP
+Every player is known at the table by the name he gave at start-up, not
+by his login name (which only ssh uses, to log in to the host). No two
+players may have the same name: a joiner whose name is taken (by the host
+or someone in the waiting room) is turned away and asked for another.
+.PP
 Four players at most: a fifth is turned away with a warning. When fewer
 than four humans play, one computer player takes a free seat; with four
 humans there is none, and while the waiting room is open a fourth human
@@ -378,7 +386,9 @@ or
 .BR hard .
 .TP
 .BR name1 " .. " name4
-The names of the human seats.
+The names of the human seats;
+.B name1
+is the player's own name, asked (and saved) at every start.
 .TP
 .B end_wages
 How many times a player draws his wages before the game ends:

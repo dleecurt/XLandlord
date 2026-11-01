@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.0.12 - 2026-11-01
+
+- The player's name in the game is no longer the system's user name. At
+  every start the game first asks "Your Name" (the name used last time is
+  filled in; Enter keeps it, an empty name is asked again, Cancel quits).
+  That name is the player's identity at the table and in network games;
+  seat 1 of the New Game form uses it without asking again.
+- The system's user name is still what ssh logs in with (and what the
+  host's waiting room suggests as user@host), but it is not tied to any
+  player's name.
+- Network play: no two players may share a name (letter case aside). A
+  joiner whose name is taken by the host or by someone in the waiting room
+  is turned away and asked for another name, then joins again.
+- tests/net checks that duplicate names are turned away.
+
 ## 0.0.11 - 2026-11-01
 
 - A dropped connection is no longer the end: the joiner's seat waits for

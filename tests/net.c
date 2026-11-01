@@ -165,7 +165,8 @@ static int robot_mode = R_QUIT;
  * loses its connection and comes back two seconds later (R_DROP_BACK), loses
  * it for good (R_DROP_GONE), or stops answering (R_STALL). Exit status: 0
  * played to the end, 2 could not join, 3 turned away with the full-table
- * warning, 4 taken out for not answering, 5 could not rejoin. */
+ * warning, 4 taken out for not answering, 5 could not rejoin, 6 turned away
+ * because someone at the table already has that name. */
 static void robot(const char *name, int leave_after)
 {
     char err[1024];
@@ -173,7 +174,7 @@ static void robot(const char *name, int leave_after)
     /* Robots join alternately by name (found in /etc/hosts) and by IP address. */
     const char *where = name[0] % 2 ? "localhost" : "127.0.0.1";
     if (net_join(where, port, self, name, err, sizeof err) < 0)
-        _exit(strstr(err, "table is full") ? 3 : 2);
+        _exit(strstr(err, "table is full") ? 3 : strstr(err, "already called") ? 6 : 2);
     int me = -1, turns = 0;
     NetMsg m;
     for (;;) {
@@ -418,6 +419,21 @@ int main(int argc, char **argv)
     robot_mode = R_QUIT;
     net_set_warning(NET_WARN_SECS, NET_GRACE_SECS);
     net_set_timers(120, 120);
+
+    /* 9. names are identities at the table: no two alike (in any case), and
+     * not the host's. */
+    port++;
+    CHECK(net_host(port, err, sizeof err) == 0, "host (names): %s", err);
+    net_set_host_name("Host");
+    pid_t ivy = spawn_robot("Ivy", 0);
+    CHECK(wait_lobby(1), "Ivy in the lobby");
+    pid_t ivy2 = spawn_robot("IVY", 0);
+    CHECK(wait_child(ivy2) == 6, "a second Ivy was not turned away for her name");
+    pid_t host2 = spawn_robot("host", 0);
+    CHECK(wait_child(host2) == 6, "a joiner called like the host was not turned away");
+    CHECK(net_lobby_count() == 1, "the lobby should still hold only Ivy (%d)", net_lobby_count());
+    net_close("Game over.");
+    { int st = wait_child(ivy); CHECK(st == 0, "Ivy exited %d", st); }
 
     if (failures) { printf("%d check(s) failed\n", failures); return 1; }
     return 0;

@@ -676,7 +676,21 @@ int netui_join(const char *given)
     xw_text(XF_UI, c.x, c.y + xw_ascent(XF_UI), msg, (int)strlen(msg), XC_INK);
     xw_flush();
 
-    if (net_join(host, port, app.prefs.net_command, app.prefs.names[0], err, sizeof err) < 0) {
+    while (net_join(host, port, app.prefs.net_command, app.prefs.names[0], err, sizeof err) < 0) {
+        /* Someone at the table already has this name: offer another. */
+        if (strstr(err, "already called")) {
+            char name[32] = "";
+            ui_message("Name Taken", err);
+            if (!ui_prompt("Your Name", "Another name to play under in this game:", name, sizeof name) || !name[0])
+                return 0;
+            for (char *q = name; *q; q++) if (*q == '|') *q = '/';
+            copy_str(app.prefs.names[0], sizeof app.prefs.names[0], name);
+            prefs_save(&app.prefs);
+            UiRect c2 = ui_frame("Join a Network Game", 460, 2 * UI_MARGIN + lh + 12 + lh);
+            xw_text(XF_UI, c2.x, c2.y + xw_ascent(XF_UI), msg, (int)strlen(msg), XC_INK);
+            xw_flush();
+            continue;
+        }
         /* The table-full warning comes back here too. */
         ui_message(strstr(err, "table is full") ? "The Table Is Full" : "Join a Network Game", err);
         return 0;

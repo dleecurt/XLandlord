@@ -39,7 +39,8 @@ typedef enum {
 
 typedef struct {
     int seat[NSEATS];       /* SeatKind of each seat, in turn order */
-    char names[NSEATS][32]; /* the names of the human seats */
+    char names[NSEATS][32]; /* the names of the human seats; names[0] is this player's own
+                               name in the game, asked at every start (never $USER) */
     int end_wages;          /* the game ends at this many wages: 3, 5, 7 or 10 */
     int advanced;           /* the "advanced and scientific" rules */
     int ask_bids;           /* ask the human to bid when a computer player lands on an unowned card */

@@ -53,14 +53,12 @@ int prefs_humans(const Prefs *p)
     return n;
 }
 
-/* See prefs.h: one human (named after $USER) against one medium computer
- * player, five wages, standard rules. */
+/* See prefs.h: one human against one medium computer player, five wages,
+ * standard rules. The human's name starts empty: it is never taken from
+ * the system's user name - the player gives it when the game starts. */
 void prefs_defaults(Prefs *p)
 {
     memset(p, 0, sizeof *p);
-    const char *u = getenv("USER");
-    copy_str(p->names[0], sizeof p->names[0], u && *u ? u : "Player 1");
-    if (p->names[0][0] >= 'a' && p->names[0][0] <= 'z') p->names[0][0] = (char)(p->names[0][0] - 'a' + 'A');
     for (int i = 1; i < NSEATS; i++) snprintf(p->names[i], sizeof p->names[i], "Player %d", i + 1);
     /* One human against one computer player of medium strength. */
     p->seat[0] = SEAT_HUMAN;

@@ -69,7 +69,7 @@ arrow keys) turn the pages.
 
 Without the 75dpi fonts the game still runs; X picks the nearest fonts it has.
 
-Current version: **0.0.11** (see `CHANGELOG.md`).
+Current version: **0.0.12** (see `CHANGELOG.md`).
 
 ## Playing
 
@@ -79,7 +79,7 @@ computer player at most**), the **computer skill** for the game (Easy,
 Medium or Hard), how
 many times a player draws his wages before the game ends (the 1906 rules say
 five) and the rules (standard, or the 1906 "advanced and scientific" rules).
-Each human seat is asked for its player's name. Then the cards are dealt
+Each other human seat is asked for its player's name. Then the cards are dealt
 (Rule 1) and each player ticks the ones he wants to buy.
 
 ### Several players at one screen (hot-seat)
@@ -101,7 +101,10 @@ One player **hosts** and up to three others **join** from their own machines.
 The connection goes through **ssh**; the game itself never opens a port to the
 network.
 
-**Starting up.** When the program starts it asks how you want to play:
+**Starting up.** When the program starts it first asks **your name** - the
+name you play under, shown to everyone and used in network games. It is
+never taken from your login name; the name used last time is filled in, so
+Enter keeps it. (Cancel quits.) Then it asks how you want to play:
 **Host a Network Game**, **Join a Network Game**, or **Play Here** (at this
 screen, against the computer or hot-seat). The same choices are in the Game
 menu at any time. To skip the question, start it with an option:

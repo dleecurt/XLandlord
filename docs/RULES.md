@@ -3,7 +3,7 @@
 *Lizzie J. Magie's game of 1904, by the rules of 1906, with the Single Tax,
 for one to four players at one screen or over the network.*
 
-XLandlord 0.0.11. Copyright (C) 2026 Lee Curtis. This document is
+XLandlord 0.0.12. Copyright (C) 2026 Lee Curtis. This document is
 part of the program and is free under the GNU General Public License,
 version 3 or later; the rules it describes are those of the public-domain 1904
 patent and 1906 rule book.
@@ -90,7 +90,13 @@ than the money you paid, before it collects a single rent.
 
 ## 3. Starting a game
 
-When the program starts it asks how you want to play:
+When the program starts it first asks **your name**: the name you play
+under, shown to the other players and used in network games. It is never
+taken from your login name on the computer. The name you used last time is
+filled in, so Enter keeps it; an empty name is not accepted, and Cancel
+quits.
+
+Then it asks how you want to play:
 
 ![The first question: host, join, or play here.](images/start-up.png)
 
@@ -119,7 +125,8 @@ The **New Game** form:
 - **Rules.** *Standard*, or *Advanced* (the "advanced and scientific" rules of
   section 14).
 
-After **Start**, each human seat is asked for its player's name. Every player
+After **Start**, each other human seat is asked for its player's name (seat
+1 is you, by the name you gave at start-up). Every player
 starts with money according to the number of players, as the 1906 rules say.
 It is set once, when the game starts, and never changes afterward (in a
 network game, a player who leaves does not change it):

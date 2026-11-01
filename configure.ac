@@ -25,7 +25,7 @@ dnl config.h (PACKAGE_VERSION, see src/version.h). It starts at 0.0.1 and goes
 dnl up by one with every release.
 
 AC_PREREQ([2.69])
-AC_INIT([XLandlord], [0.0.11], [], [xlandlord])
+AC_INIT([XLandlord], [0.0.12], [], [xlandlord])
 AC_COPYRIGHT([Copyright (C) 2026 Lee Curtis
 License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>
 This is free software: you are free to change and redistribute it.
