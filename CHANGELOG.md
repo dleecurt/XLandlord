@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.0.7 - 2026-10-31
+
+- The game is now called **XLandlord** (it was "Viola the Landlord"), and
+  so is the program: `XLandlord`. The tarball, documents folder, icons and
+  menu entry use the lower-case `xlandlord`; the man page is
+  `man 6 XLandlord`; the rule book is `docs/xlandlord-rules.pdf`. The look is
+  still the Viola design style.
+- Preferences move to `~/.config/xlandlord/preferences.conf`. The first
+  time XLandlord runs it reads `~/.config/viola-landlord/preferences.conf`,
+  if there is one, and saves it under the new name (a `net_command` of
+  `viola-landlord` becomes `XLandlord`).
+- For network play every machine needs XLandlord 0.0.7: the joiner's ssh
+  now runs `XLandlord --relay` on the host. The ssh stand-in variable for
+  testing is now `XLANDLORD_SSH`.
+- The project is on GitHub: https://github.com/dleecurt/XLandlord
+
 ## 0.0.6 - 2026-10-31
 
 - Each player's machine is shown next to his name: in the host's waiting
@@ -41,7 +57,7 @@
   installed where, uninstalling, network-play needs, troubleshooting).
 - docs/RULES.md: the complete rule book and how-to-play guide, with
   screenshots, a numbered board map, the history of the game and a
-  quick-reference page; and docs/viola-landlord-rules.pdf made from it.
+  quick-reference page; and docs/xlandlord-rules.pdf made from it.
 - `make pdf` rebuilds the PDF (and the board map, from the game's own board
   data, by docs/boardmap.c) when configure finds pandoc and pdflatex; the
   PDF ships ready-made otherwise.
@@ -52,7 +68,7 @@
 
 - Network play over ssh. One player hosts (Game > Host a Network Game) and
   up to three join (Game > Join a Network Game, giving `[user@]host`). The
-  joiner's game runs `ssh -T -o BatchMode=yes host viola-landlord --relay
+  joiner's game runs `ssh -T -o BatchMode=yes host XLandlord --relay
   PORT`; the relay connects to the hosting game, which listens on localhost
   only. Password-less ssh keys are assumed; README.md and Help > Network Play
   explain how to set them up.
@@ -96,6 +112,6 @@ First release.
 - X11 interface in plain Xlib in the Viola design style: menu bar, dialogs,
   check lists, forms, the board drawn after the 1904 patent layout.
 - Original pixel art (GPL-3.0-or-later and CC0 1.0).
-- Preferences in `~/.config/viola-landlord/preferences.conf`.
+- Preferences in `~/.config/xlandlord/preferences.conf`.
 - `make check`: hundreds of computer-only games test the rules engine and
   the order of the difficulty levels.

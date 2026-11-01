@@ -1,8 +1,8 @@
 # built by make
 *.o
 .deps/
-viola-landlord
-viola-landlord.6
+XLandlord
+XLandlord.6
 tests/engine
 *.log
 *.trs
@@ -23,6 +23,6 @@ autom4te.cache/
 build-aux/
 .dirstamp
 configure~
-viola-landlord-*/
+xlandlord-*/
 docs/boardmap
 /tests/net

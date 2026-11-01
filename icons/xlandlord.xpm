@@ -1,5 +1,5 @@
 /* XPM */
-static const char *viola_landlord[] = {
+static const char *xlandlord[] = {
 /* columns rows colors chars-per-pixel */
 "32 32 7 1 ",
 "  c #C00000",

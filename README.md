@@ -1,4 +1,4 @@
-# Viola the Landlord
+# XLandlord
 
 **The Landlord's Game**, the board game Lizzie J. Magie patented in 1904
 (US Patent 748,626) and the ancestor of Monopoly, for X11, played against the
@@ -9,28 +9,29 @@ browser, like Ted Viola: flat gray94 panels, 2px light and dark bevels, 1px
 black boxes, Helvetica menus with Viola's small triangles, black focus
 rectangles on the buttons.
 
-The project is called **Viola the Landlord**; the program you run is
-`viola-landlord`.
+The game and the program you run are both called **XLandlord** (up to
+version 0.0.6 it was called Viola the Landlord). The source is at
+<https://github.com/dleecurt/XLandlord>.
 
-Viola the Landlord is free software, released under the **GNU General Public
+XLandlord is free software, released under the **GNU General Public
 License, version 3 or (at your option) any later version**. See
 [License](#license).
 
 ## Quick start
 
-From a release tarball (`viola-landlord-X.Y.Z.tar.gz`) you need a C compiler,
+From a release tarball (`xlandlord-X.Y.Z.tar.gz`) you need a C compiler,
 make and the X11 development files:
 
 ```
 ./configure     # checks the system (GNU autoconf); --prefix=DIR chooses where to install
-make            # builds ./viola-landlord
+make            # builds ./XLandlord
 make check      # plays hundreds of computer-only games to test the rules (no display needed)
-make install    # into /usr/local by default (needs privileges); man page:  man 6 viola-landlord
+make install    # into /usr/local by default (needs privileges); man page:  man 6 XLandlord
 make uninstall
 make clean
 
-./viola-landlord
-./viola-landlord --version
+./XLandlord
+./XLandlord --version
 ```
 
 From a source checkout (no `configure` yet), run `./autogen.sh` first; it
@@ -42,8 +43,8 @@ installed where, uninstalling, network-play requirements and troubleshooting.
 
 **[docs/RULES.md](docs/RULES.md)** is the complete rule book and how-to-play
 guide, with screenshots, a numbered board map and a quick-reference page; the
-same document is in **[docs/viola-landlord-rules.pdf](docs/viola-landlord-rules.pdf)**
-for printing. Both are installed in `$(prefix)/share/doc/viola-landlord`.
+same document is in **[docs/xlandlord-rules.pdf](docs/xlandlord-rules.pdf)**
+for printing. Both are installed in `$(prefix)/share/doc/xlandlord`.
 
 | System        | Build                           | Fonts (to look like Viola)                  |
 | ------------- | ------------------------------- | ------------------------------------------- |
@@ -53,7 +54,7 @@ for printing. Both are installed in `$(prefix)/share/doc/viola-landlord`.
 
 Without the 75dpi fonts the game still runs; X picks the nearest fonts it has.
 
-Current version: **0.0.6** (see `CHANGELOG.md`).
+Current version: **0.0.7** (see `CHANGELOG.md`).
 
 ## Playing
 
@@ -89,10 +90,10 @@ screen, against the computer or hot-seat). The same choices are in the Game
 menu at any time. To skip the question, start it with an option:
 
 ```
-viola-landlord --host                 # host a network game
-viola-landlord --join 192.168.1.20    # join the game on that machine
-viola-landlord --join lee@gamebox     # ... by host name, as user lee
-viola-landlord --local                # play at this screen
+XLandlord --host                 # host a network game
+XLandlord --join 192.168.1.20    # join the game on that machine
+XLandlord --join lee@gamebox     # ... by host name, as user lee
+XLandlord --local                # play at this screen
 ```
 
 **Hosting.** Game > Host a Network Game. Choose the strength of the computer
@@ -146,10 +147,10 @@ for an IPv6 address with a port, put the address in brackets:
 **How it works.** The joiner's program runs
 
 ```
-ssh -T -o BatchMode=yes user@host viola-landlord --relay 1904
+ssh -T -o BatchMode=yes user@host XLandlord --relay 1904
 ```
 
-On the host, ssh starts a second copy of viola-landlord as a *relay*, which
+On the host, ssh starts a second copy of XLandlord as a *relay*, which
 connects to the hosting game on `127.0.0.1:1904` and copies messages both ways.
 The host runs the only real game; joiners draw what it sends and answer its
 questions. `BatchMode=yes` means ssh will never stop to ask for a password, so
@@ -185,7 +186,7 @@ machine**:
    this prints the version **without asking anything**:
 
    ```
-   ssh -o BatchMode=yes user@host viola-landlord --version
+   ssh -o BatchMode=yes user@host XLandlord --version
    ```
 
 If step 4 fails:
@@ -196,9 +197,9 @@ If step 4 fails:
 - "Host key verification failed": do the plain `ssh user@host` once.
 - "command not found": non-interactive ssh does not see the host's PATH (for
   instance `/usr/local/bin`). Either fix the PATH for non-interactive shells on
-  the host, or set `net_command = /usr/local/bin/viola-landlord` (the full path
-  on the host) in the joiner's `~/.config/viola-landlord/preferences.conf`.
-- Every machine needs the **same version** of Viola the Landlord; a different
+  the host, or set `net_command = /usr/local/bin/XLandlord` (the full path
+  on the host) in the joiner's `~/.config/xlandlord/preferences.conf`.
+- Every machine needs the **same version** of XLandlord; a different
   version is turned away with a message.
 
 To use a different user name, port or key for ssh, put a `Host` entry in the
@@ -236,12 +237,15 @@ Options > Game Settings (also your name), Computer Speed (fast, normal,
 slow), **Ask Me to Bid** (off: you are never asked to bid when a computer
 player lands on an unowned card), **Confirm Each Computer Move** (wait for a key
 after every computer turn). They are kept in
-`~/.config/viola-landlord/preferences.conf` (`$XDG_CONFIG_HOME` is honored),
+`~/.config/xlandlord/preferences.conf` (`$XDG_CONFIG_HOME` is honored),
 with the seats as `seat1` .. `seat4` (`empty`, `human`, `easy`, `medium`,
 `hard`) and the human names as `name1` .. `name4`; for network play
 `net_host` (the last host joined), `net_port` (the port to host on),
-`net_command` (the program ssh runs on the host, normally `viola-landlord`) and
-`net_cpu` (the hosted game's computer player). A 0.0.1 file is converted.
+`net_command` (the program ssh runs on the host, normally `XLandlord`) and
+`net_cpu` (the hosted game's computer player). A 0.0.1 file is converted,
+and a file from before the game was renamed XLandlord
+(`~/.config/viola-landlord/preferences.conf`) is read once and saved under
+the new name.
 
 ## The rules as implemented
 
@@ -301,7 +305,7 @@ Only public-domain material or art made for this program is used:
 - Every **picture** (the globe, Jail, the tree in Central Park, the Poor House,
   the locomotive, the bulb, the trolley, the necessities, the luxury gem, the
   dice, the legacy scroll, the college, the houses and the program icon) is
-  original pixel art made for Viola the Landlord, stored as text in
+  original pixel art made for XLandlord, stored as text in
   `src/art.c`. It is released under the GPL with the program and also dedicated
   to the public domain under **CC0 1.0**, so it can be redistributed anywhere.
 - The fonts are the X server's own core fonts.

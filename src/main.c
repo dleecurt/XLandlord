@@ -1,5 +1,5 @@
 /*
- * Viola the Landlord - The Landlord's Game for X11
+ * XLandlord - The Landlord's Game for X11
  * Copyright (C) 2026 Lee Curtis
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
@@ -18,7 +18,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* main.c - Viola the Landlord: start-up, the main loop and the commands.
+/* main.c - XLandlord: start-up, the main loop and the commands.
  *
  * THE MAIN LOOP
  *   While a game is on: if it is a computer player's turn, play it (the
@@ -715,8 +715,8 @@ static void cmd_space_info(int sp)
 /* Help > About. */
 static void cmd_about(void)
 {
-    ui_message("About Viola the Landlord",
-               "Viola the Landlord " PACKAGE_VERSION_STR "\n\n"
+    ui_message("About XLandlord",
+               "XLandlord " PACKAGE_VERSION_STR "\n\n"
                "The Landlord's Game, invented by Lizzie J. Magie (US Patent 748,626, 1904), played by the rules "
                "of 1906 with the Single Tax, against the computer, in the style of the Viola browser.\n\n"
                "Copyright (C) 2026 Lee Curtis. Free software under the GNU GPL, version 3 or later.");
@@ -759,7 +759,7 @@ static void start_up(StartMode mode, const char *join_host)
 {
     if (mode == START_ASK) {
         static const char *const b[] = { "&Host a Network Game", "&Join a Network Game", "&Play Here", "&Quit" };
-        int i = ui_ask("Viola the Landlord",
+        int i = ui_ask("XLandlord",
                        "Welcome to The Landlord's Game.\n\n"
                        "Host a Network Game: you run the game here and up to three players join from their own "
                        "machines over ssh.\n"
@@ -910,19 +910,19 @@ int main(int argc, char **argv)
         if (!strcmp(argv[i], "--host")) { mode = START_HOST; continue; }
         if (!strcmp(argv[i], "--local")) { mode = START_LOCAL; continue; }
         if (!strcmp(argv[i], "--join")) {
-            if (i + 1 >= argc) { fprintf(stderr, "viola-landlord: --join needs the host (an IP address or a name)\n"); return 2; }
+            if (i + 1 >= argc) { fprintf(stderr, "XLandlord: --join needs the host (an IP address or a name)\n"); return 2; }
             mode = START_JOIN;
             join_host = argv[++i];
             continue;
         }
         if (!strcmp(argv[i], "--version") || !strcmp(argv[i], "-v")) {
-            printf("viola-landlord %s\n", PACKAGE_VERSION_STR);
+            printf("XLandlord %s\n", PACKAGE_VERSION_STR);
             return 0;
         }
         if (!strcmp(argv[i], "--help") || !strcmp(argv[i], "-h")) {
-            printf("usage: viola-landlord [--host | --join [USER@]HOST[:PORT] | --local]\n"
-                   "       viola-landlord --version | --help\n"
-                   "       viola-landlord --relay PORT   (run by ssh for network play; not by hand)\n"
+            printf("usage: XLandlord [--host | --join [USER@]HOST[:PORT] | --local]\n"
+                   "       XLandlord --version | --help\n"
+                   "       XLandlord --relay PORT   (run by ssh for network play; not by hand)\n"
                    "\n"
                    "  --host     host a network game (others join over ssh)\n"
                    "  --join H   join the game hosted on H: an IP address, or a host name found\n"
@@ -930,10 +930,10 @@ int main(int argc, char **argv)
                    "  --local    play at this screen (against the computer, or hot-seat)\n"
                    "  With none of these, the game asks at start-up.\n"
                    "The Landlord's Game (Lizzie J. Magie, 1904) against the computer, for X11.\n"
-                   "Settings are kept in ~/.config/viola-landlord/preferences.conf.\n");
+                   "Settings are kept in ~/.config/xlandlord/preferences.conf.\n");
             return 0;
         }
-        fprintf(stderr, "viola-landlord: unknown option %s (try --help)\n", argv[i]);
+        fprintf(stderr, "XLandlord: unknown option %s (try --help)\n", argv[i]);
         return 2;
     }
     prefs_load(&app.prefs);

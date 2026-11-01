@@ -1,9 +1,9 @@
-# Building and installing Viola the Landlord
+# Building and installing XLandlord
 
-This guide covers building Viola the Landlord from source, installing and
+This guide covers building XLandlord from source, installing and
 uninstalling it, and the problems you are most likely to run into. For what
 the game is and how to play it, see `README.md` and `docs/RULES.md` (or its
-PDF, `docs/viola-landlord-rules.pdf`).
+PDF, `docs/xlandlord-rules.pdf`).
 
 Contents:
 
@@ -61,12 +61,12 @@ After installing new X fonts, either restart the X server or run
 
 ## 2. Building from a release tarball
 
-A release tarball (`viola-landlord-X.Y.Z.tar.gz`) already contains the
+A release tarball (`xlandlord-X.Y.Z.tar.gz`) already contains the
 `configure` script, so you only need the build tools from section 1.
 
 ```
-tar xzf viola-landlord-0.0.6.tar.gz
-cd viola-landlord-0.0.6
+tar xzf xlandlord-0.0.7.tar.gz
+cd xlandlord-0.0.7
 ./configure
 make
 make check            # optional, about 10 seconds, needs no display
@@ -76,20 +76,20 @@ sudo make install
 Then start it from your desktop's Games menu, or from a terminal:
 
 ```
-viola-landlord
+XLandlord
 ```
 
 `configure` ends with a summary, for example:
 
 ```
-  Viola the Landlord 0.0.6 is configured:
+  XLandlord 0.0.7 is configured:
     compiler:        gcc
     X11:             -lX11
     install prefix:  /usr/local
     rules PDF:       shipped copy (pandoc or pdflatex not found, so make pdf is off)
 ```
 
-You can also run the game without installing it: `./viola-landlord` in the
+You can also run the game without installing it: `./XLandlord` in the
 build directory works the same.
 
 ## 3. Building from a git checkout
@@ -98,8 +98,8 @@ A checkout does not contain the generated files (`configure`, `Makefile.in`,
 `config.h.in`). Make them once with `autogen.sh`:
 
 ```
-git clone <the repository's URL> viola-landlord
-cd viola-landlord
+git clone https://github.com/dleecurt/XLandlord.git
+cd XLandlord
 ./autogen.sh          # runs autoreconf --install
 ./configure
 make
@@ -128,7 +128,7 @@ The usual GNU options all work; these are the ones that matter here:
 | `--prefix=DIR` | Install under `DIR` instead of `/usr/local`. `--prefix=$HOME/.local` installs for yourself only, without root. |
 | `--bindir=DIR` | Where the program goes (default `PREFIX/bin`). |
 | `--mandir=DIR` | Where the man page goes (default `PREFIX/share/man`; it is installed in section 6, games). |
-| `--docdir=DIR` | Where the documents go (default `PREFIX/share/doc/viola-landlord`). |
+| `--docdir=DIR` | Where the documents go (default `PREFIX/share/doc/xlandlord`). |
 | `CC=clang` | Use another compiler. |
 | `CFLAGS="-O2 -g"` | Compiler flags (the default is `-g -O2`; `-Wall -Wextra` are added when the compiler takes them). |
 | `PKG_CONFIG_PATH=...` | Where pkg-config looks for `x11.pc`, for an X11 in an unusual place. |
@@ -150,14 +150,14 @@ manager does that).
 
 | Target | What it does |
 | ------ | ------------ |
-| `make` | Builds `./viola-landlord`. |
+| `make` | Builds `./XLandlord`. |
 | `make check` | Runs the tests (also `make test`). `tests/engine` plays several hundred games between computer players and checks the rules engine and that Hard beats Medium beats Easy; `tests/net` plays whole network games through a stand-in for ssh (the four-player limit, no computer player with four humans, a player dropping out). No display is needed. |
 | `make install` | Installs everything listed in section 6. |
 | `make uninstall` | Removes it again. |
-| `make pdf` | Rebuilds `docs/viola-landlord-rules.pdf` from `docs/RULES.md` (needs pandoc and LaTeX; see section 9). |
+| `make pdf` | Rebuilds `docs/xlandlord-rules.pdf` from `docs/RULES.md` (needs pandoc and LaTeX; see section 9). |
 | `make clean` | Removes what `make` built. |
 | `make distclean` | Also removes what `configure` made. |
-| `make dist` | Makes `viola-landlord-X.Y.Z.tar.gz`, ready to build anywhere. |
+| `make dist` | Makes `xlandlord-X.Y.Z.tar.gz`, ready to build anywhere. |
 | `make distcheck` | Makes the tarball, then unpacks, builds, tests and installs it in a scratch directory to prove it is complete. |
 
 ## 6. What gets installed, and where
@@ -166,18 +166,20 @@ With the default prefix `/usr/local`:
 
 | File | Where |
 | ---- | ----- |
-| the program | `/usr/local/bin/viola-landlord` |
-| the man page | `/usr/local/share/man/man6/viola-landlord.6` (`man 6 viola-landlord`) |
-| the menu entry | `/usr/local/share/applications/viola-landlord.desktop` |
-| the icon, at 16 to 256 pixels | `/usr/local/share/icons/hicolor/NxN/apps/viola-landlord.png` |
-| the scalable icon | `/usr/local/share/icons/hicolor/scalable/apps/viola-landlord.svg` |
-| the classic X icon | `/usr/local/share/pixmaps/viola-landlord.xpm` |
-| the documents | `/usr/local/share/doc/viola-landlord/`: `README.md`, `INSTALL.md`, `CHANGELOG.md`, `RULES.md`, `viola-landlord-rules.pdf` and the board pictures the rules use |
+| the program | `/usr/local/bin/XLandlord` |
+| the man page | `/usr/local/share/man/man6/XLandlord.6` (`man 6 XLandlord`) |
+| the menu entry | `/usr/local/share/applications/xlandlord.desktop` |
+| the icon, at 16 to 256 pixels | `/usr/local/share/icons/hicolor/NxN/apps/xlandlord.png` |
+| the scalable icon | `/usr/local/share/icons/hicolor/scalable/apps/xlandlord.svg` |
+| the classic X icon | `/usr/local/share/pixmaps/xlandlord.xpm` |
+| the documents | `/usr/local/share/doc/xlandlord/`: `README.md`, `INSTALL.md`, `CHANGELOG.md`, `RULES.md`, `xlandlord-rules.pdf` and the board pictures the rules use |
 
 The game keeps no files of its own outside your home directory. Its settings
-live in `~/.config/viola-landlord/preferences.conf` (or
-`$XDG_CONFIG_HOME/viola-landlord/preferences.conf`), written the first time you
-change something.
+live in `~/.config/xlandlord/preferences.conf` (or
+`$XDG_CONFIG_HOME/xlandlord/preferences.conf`), written the first time you
+change something. Up to version 0.0.6 the game was called Viola the Landlord
+and kept them in `~/.config/viola-landlord/`; XLandlord reads that file once
+and saves it under the new name, after which the old folder can be removed.
 
 ## 7. Uninstalling
 
@@ -191,7 +193,7 @@ This removes every file in section 6 (empty directories are left). Your
 settings stay; remove them with:
 
 ```
-rm -r ~/.config/viola-landlord
+rm -r ~/.config/xlandlord
 ```
 
 ## 8. Network play: what each machine needs
@@ -199,7 +201,7 @@ rm -r ~/.config/viola-landlord
 Network play needs nothing extra at build time: it uses plain sockets and runs
 the system's `ssh` program. At run time:
 
-- **Every machine** needs the same version of Viola the Landlord installed (a
+- **Every machine** needs the same version of XLandlord installed (a
   different version is turned away with a message).
 - **The host** needs an ssh server running (`sudo apt install openssh-server`,
   or `sshd=YES` in NetBSD's `/etc/rc.conf`). The game listens on
@@ -215,21 +217,21 @@ the system's `ssh` program. At run time:
   walk through it; the check is:
 
   ```
-  ssh -o BatchMode=yes user@host viola-landlord --version
+  ssh -o BatchMode=yes user@host XLandlord --version
   ```
 
   It must print the version without asking for anything.
 - If the host installed the game outside the PATH that non-interactive ssh
   sees (for instance under `--prefix=$HOME/.local`), set the full path on each
-  joiner's machine in `~/.config/viola-landlord/preferences.conf`:
+  joiner's machine in `~/.config/xlandlord/preferences.conf`:
 
   ```
-  net_command = /home/lee/.local/bin/viola-landlord
+  net_command = /home/lee/.local/bin/XLandlord
   ```
 
 ## 9. Rebuilding the rules PDF
 
-`docs/viola-landlord-rules.pdf` is generated from `docs/RULES.md` and comes
+`docs/xlandlord-rules.pdf` is generated from `docs/RULES.md` and comes
 ready-made with the source, so you never need to build it to play or install.
 To rebuild it after editing the rules:
 
@@ -266,11 +268,11 @@ or give `X11_CFLAGS` and `X11_LIBS` yourself.
 Install autoconf, automake and pkg-config (the last provides the `PKG_*`
 macros), then run `./autogen.sh` again.
 
-**`viola-landlord: cannot open the X display`**
+**`XLandlord: cannot open the X display`**
 The game is an X11 program: start it inside an X session, or set `DISPLAY`
 (for example `DISPLAY=:0`). Over ssh use `ssh -X`.
 
-**`viola-landlord: no usable X font found`**
+**`XLandlord: no usable X font found`**
 The X server has no fonts at all that the game can use. Install
 `xfonts-base` (or your system's equivalent) and run `xset fp rehash`.
 

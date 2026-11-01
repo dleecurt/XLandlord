@@ -1,4 +1,4 @@
-dnl Viola the Landlord - The Landlord's Game for X11
+dnl XLandlord - The Landlord's Game for X11
 dnl Copyright (C) 2026 Lee Curtis
 dnl
 dnl SPDX-License-Identifier: GPL-3.0-or-later
@@ -25,7 +25,7 @@ dnl config.h (PACKAGE_VERSION, see src/version.h). It starts at 0.0.1 and goes
 dnl up by one with every release.
 
 AC_PREREQ([2.69])
-AC_INIT([Viola the Landlord], [0.0.6], [], [viola-landlord])
+AC_INIT([XLandlord], [0.0.7], [], [xlandlord])
 AC_COPYRIGHT([Copyright (C) 2026 Lee Curtis
 License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>
 This is free software: you are free to change and redistribute it.
@@ -54,12 +54,12 @@ AC_SUBST([WARN_CFLAGS])
 
 dnl The timed wait for the computer players' moves.
 AC_CHECK_HEADERS([sys/select.h sys/time.h], [],
-  [AC_MSG_ERROR([the system lacks $ac_header, which Viola the Landlord needs])])
+  [AC_MSG_ERROR([the system lacks $ac_header, which XLandlord needs])])
 AC_CHECK_FUNCS([select gettimeofday], [],
-  [AC_MSG_ERROR([the C library lacks $ac_func, which Viola the Landlord needs])])
+  [AC_MSG_ERROR([the C library lacks $ac_func, which XLandlord needs])])
 
 dnl ---- X11 ----
-dnl Viola the Landlord draws everything itself with plain Xlib, like the Viola
+dnl XLandlord draws everything itself with plain Xlib, like the Viola
 dnl browser: no toolkit. pkg-config finds libX11 on any modern system; without
 dnl pkg-config we try the usual -lX11 (AC_PATH_XTRA's places included).
 PKG_PROG_PKG_CONFIG
@@ -85,7 +85,7 @@ AC_SUBST([X11_CFLAGS])
 AC_SUBST([X11_LIBS])
 
 dnl ---- the rules PDF (optional) ----
-dnl docs/viola-landlord-rules.pdf ships ready-made; `make pdf` rebuilds it
+dnl docs/xlandlord-rules.pdf ships ready-made; `make pdf` rebuilds it
 dnl from docs/RULES.md with pandoc and a LaTeX engine, when both are here.
 AC_ARG_VAR([PANDOC], [pandoc, to rebuild the rules PDF with make pdf])
 AC_ARG_VAR([PDFLATEX], [the LaTeX engine pandoc uses for the rules PDF])
@@ -96,11 +96,11 @@ AS_IF([test -n "$PANDOC" && test -n "$PDFLATEX"],
   [pdf_note="shipped copy (pandoc or pdflatex not found, so make pdf is off)"])
 AM_CONDITIONAL([HAVE_PANDOC], [test -n "$PANDOC" && test -n "$PDFLATEX"])
 
-AC_CONFIG_FILES([Makefile viola-landlord.6])
+AC_CONFIG_FILES([Makefile XLandlord.6])
 AC_OUTPUT
 
 AC_MSG_NOTICE([
-  Viola the Landlord $VERSION is configured:
+  XLandlord $VERSION is configured:
     compiler:        $CC
     X11:             $X11_CFLAGS $X11_LIBS
     install prefix:  $prefix

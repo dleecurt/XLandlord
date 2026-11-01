@@ -1,5 +1,5 @@
 /*
- * Viola the Landlord - The Landlord's Game for X11
+ * XLandlord - The Landlord's Game for X11
  * Copyright (C) 2026 Lee Curtis
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
@@ -500,14 +500,14 @@ static int humans_seated(void)
 static void greet(int c, const char *line)
 {
     NetMsg m;
-    if (net_parse(line, &m) < 0 || m.kind != NM_HELLO) { refuse(c, "That is not Viola the Landlord speaking."); return; }
+    if (net_parse(line, &m) < 0 || m.kind != NM_HELLO) { refuse(c, "That is not XLandlord speaking."); return; }
     copy_str(conns[c].name, sizeof conns[c].name, m.text[0] ? m.text : "Player");
     for (char *q = conns[c].name; *q; q++) if (*q == '|') *q = '/';    /* '|' separates fields in PLAYER */
     /* No FROM line (a relay that is not ours): say so rather than guess. */
     if (!conns[c].from[0]) copy_str(conns[c].from, sizeof conns[c].from, "an unknown machine");
     if (m.num[0] != NET_PROTOCOL) {
         event("%s was turned away: a different version of the game.%s", conns[c].name, "");
-        refuse(c, "The host runs a different version of Viola the Landlord; use the same version on every machine.");
+        refuse(c, "The host runs a different version of XLandlord; use the same version on every machine.");
         return;
     }
     if (humans_seated() >= MAXPLAYERS) {
@@ -1100,7 +1100,7 @@ int net_join(const char *host, int port, const char *remote_cmd, const char *nam
         return -1;
     }
     ssh_err = tmpfile();
-    const char *ssh = getenv("VIOLA_LANDLORD_SSH");
+    const char *ssh = getenv("XLANDLORD_SSH");
     if (!ssh || !*ssh) ssh = "ssh";
     char portbuf[16];
     snprintf(portbuf, sizeof portbuf, "%d", port);
@@ -1119,7 +1119,7 @@ int net_join(const char *host, int port, const char *remote_cmd, const char *nam
         /* -T: no terminal; BatchMode: never ask for a password (keys only);
          * the remote command runs the relay on the host. */
         execlp(ssh, ssh, "-T", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15", host,
-               remote_cmd && *remote_cmd ? remote_cmd : "viola-landlord", "--relay", portbuf, (char *)NULL);
+               remote_cmd && *remote_cmd ? remote_cmd : "XLandlord", "--relay", portbuf, (char *)NULL);
         fprintf(stderr, "cannot run %s: %s\n", ssh, strerror(errno));
         _exit(127);
     }

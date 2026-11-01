@@ -1,5 +1,5 @@
 /*
- * Viola the Landlord - The Landlord's Game for X11
+ * XLandlord - The Landlord's Game for X11
  * Copyright (C) 2026 Lee Curtis
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
@@ -30,7 +30,7 @@ void *xrealloc(void *p, size_t n)
 {
     void *q = realloc(p, n ? n : 1);
     if (!q) {
-        fputs("viola-landlord: out of memory\n", stderr);
+        fputs("XLandlord: out of memory\n", stderr);
         exit(1);
     }
     return q;

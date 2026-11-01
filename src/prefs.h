@@ -1,5 +1,5 @@
 /*
- * Viola the Landlord - The Landlord's Game for X11
+ * XLandlord - The Landlord's Game for X11
  * Copyright (C) 2026 Lee Curtis
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
@@ -19,8 +19,10 @@
  */
 
 /* prefs.h - the settings that last from one game to the next, kept in
- * $XDG_CONFIG_HOME/viola-landlord/preferences.conf (normally
- * ~/.config/viola-landlord/preferences.conf) as "key = value" lines. */
+ * $XDG_CONFIG_HOME/xlandlord/preferences.conf (normally
+ * ~/.config/xlandlord/preferences.conf) as "key = value" lines. A file
+ * left by 0.0.6 or earlier, when the game was "Viola the Landlord", in
+ * viola-landlord/preferences.conf, is read once and saved here. */
 #ifndef PREFS_H
 #define PREFS_H
 

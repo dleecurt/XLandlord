@@ -1,5 +1,5 @@
 /*
- * Viola the Landlord - The Landlord's Game for X11
+ * XLandlord - The Landlord's Game for X11
  * Copyright (C) 2026 Lee Curtis
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
@@ -134,7 +134,7 @@ int main(void)
     }
     /* The middle: a title, the direction of play and a key. */
     text(S / 2, 230, 34, "bold", "THE LANDLORD'S GAME");
-    text(S / 2, 262, 16, "normal", "The board of Viola the Landlord, after Lizzie J. Magie's 1904 patent");
+    text(S / 2, 262, 16, "normal", "The board of XLandlord, after Lizzie J. Magie's 1904 patent");
     text(S / 2, 290, 15, "normal", "Play runs from MOTHER EARTH (0) right to left along the bottom, then up, across and down.");
     text(S / 2, 312, 15, "normal", "Between the Chances at 32 and 39 a player may move either way.");
     static const struct { const char *color, *what; } key[] = {

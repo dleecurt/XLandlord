@@ -1,5 +1,5 @@
 /*
- * Viola the Landlord - The Landlord's Game for X11
+ * XLandlord - The Landlord's Game for X11
  * Copyright (C) 2026 Lee Curtis
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
@@ -76,7 +76,7 @@ void prefs_defaults(Prefs *p)
     p->speed = 1;
     p->net_host[0] = '\0';
     p->net_port = 1904;
-    copy_str(p->net_command, sizeof p->net_command, "viola-landlord");
+    copy_str(p->net_command, sizeof p->net_command, "XLandlord");
     p->net_cpu = SEAT_MEDIUM;
 }
 
@@ -89,20 +89,28 @@ static int seat_from_word(const char *w)
     return -1;
 }
 
-/* The directory, made if missing; returns 0 if there is no home. */
-static int config_dir(char *out, size_t size, int make)
+/* The directory, made if missing; returns 0 if there is no home.
+ * `name` is the folder under the config base: "xlandlord", or the
+ * folder of the game's former name when reading old preferences. */
+static int config_dir_named(char *out, size_t size, int make, const char *name)
 {
     const char *xdg = getenv("XDG_CONFIG_HOME"), *home = getenv("HOME");
     char base[512];
     if (xdg && *xdg) snprintf(base, sizeof base, "%s", xdg);
     else if (home && *home) snprintf(base, sizeof base, "%s/.config", home);
     else return 0;
-    snprintf(out, size, "%s/viola-landlord", base);
+    snprintf(out, size, "%s/%s", base, name);
     if (make) {
         mkdir(base, 0755);
         if (mkdir(out, 0755) != 0 && errno != EEXIST) return 0;
     }
     return 1;
+}
+
+/* This game's own preferences directory (see config_dir_named). */
+static int config_dir(char *out, size_t size, int make)
+{
+    return config_dir_named(out, size, make, "xlandlord");
 }
 
 /* See prefs.h. Unknown keys are ignored; 0.0.1 files (name, difficulty,
@@ -114,7 +122,16 @@ void prefs_load(Prefs *p)
     if (!config_dir(dir, sizeof dir, 0)) return;
     snprintf(path, sizeof path, "%s/preferences.conf", dir);
     FILE *f = fopen(path, "r");
-    if (!f) return;
+    int migrated = 0;
+    if (!f) {
+        /* Up to 0.0.6 the game was "Viola the Landlord" and kept its file
+         * in viola-landlord/; read that once and save it under the new
+         * name (below). */
+        if (!config_dir_named(dir, sizeof dir, 0, "viola-landlord")) return;
+        snprintf(path, sizeof path, "%s/preferences.conf", dir);
+        if (!(f = fopen(path, "r"))) return;
+        migrated = 1;
+    }
     int old_diff = SEAT_MEDIUM;
     while (fgets(line, sizeof line, f)) {
         char *eq = strchr(line, '=');
@@ -160,6 +177,11 @@ void prefs_load(Prefs *p)
         prefs_defaults(&d);
         memcpy(p->seat, d.seat, sizeof p->seat);
     }
+    if (migrated) {
+        /* The old default relay command was the old program name. */
+        if (!strcmp(p->net_command, "viola-landlord")) copy_str(p->net_command, sizeof p->net_command, "XLandlord");
+        prefs_save(p);
+    }
 }
 
 /* See prefs.h: the whole file, rewritten. */
@@ -170,7 +192,7 @@ int prefs_save(const Prefs *p)
     snprintf(path, sizeof path, "%s/preferences.conf", dir);
     FILE *f = fopen(path, "w");
     if (!f) return 0;
-    fprintf(f, "# Viola the Landlord preferences (written by the program; edit freely)\n");
+    fprintf(f, "# XLandlord preferences (written by the program; edit freely)\n");
     fprintf(f, "# seatN = empty | human | easy | medium | hard; nameN = a human seat's name\n");
     for (int i = 0; i < NSEATS; i++) {
         fprintf(f, "seat%d = %s\n", i + 1, seat_word[CLAMP(p->seat[i], 0, SEAT_KINDS - 1)]);

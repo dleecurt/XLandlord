@@ -1,9 +1,9 @@
-# The Landlord's Game: How to Play Viola the Landlord
+# The Landlord's Game: How to Play XLandlord
 
 *Lizzie J. Magie's game of 1904, by the rules of 1906, with the Single Tax,
 for one to four players at one screen or over the network.*
 
-Viola the Landlord 0.0.6. Copyright (C) 2026 Lee Curtis. This document is
+XLandlord 0.0.7. Copyright (C) 2026 Lee Curtis. This document is
 part of the program and is free under the GNU General Public License,
 version 3 or later; the rules it describes are those of the public-domain 1904
 patent and 1906 rule book.
@@ -59,7 +59,7 @@ own boards. One of those boards reached Charles Darrow, whose version Parker
 Brothers sold as *Monopoly* from 1935; the firm bought Magie's 1924 patent for
 $500. Her part in the story was largely forgotten until the 1970s.
 
-Viola the Landlord plays the 1906 game, against the computer or against other
+XLandlord plays the 1906 game, against the computer or against other
 people, in a window drawn in the style of the Viola web browser of 1992.
 
 ## 2. What you are trying to do
@@ -94,7 +94,7 @@ When the program starts it asks how you want to play:
   taking turns. This opens the **New Game** form described below.
 
 The same choices are in the Game menu at any time (Game > New Game is *Play
-Here*; Ctrl+N). From a terminal, `viola-landlord --host`, `--join HOST` or
+Here*; Ctrl+N). From a terminal, `XLandlord --host`, `--join HOST` or
 `--local` skips the question.
 
 The **New Game** form:
@@ -533,7 +533,7 @@ each joiner's machine:
 ```
 ssh-keygen -t ed25519          # once, if you have no key
 ssh-copy-id user@host          # puts the key on the host
-ssh -o BatchMode=yes user@host viola-landlord --version
+ssh -o BatchMode=yes user@host XLandlord --version
 ```
 
 The last command must print the version without asking anything. README.md and
@@ -557,9 +557,9 @@ connection runs inside ssh.
 | Ctrl+N | new game |
 | Ctrl+Q | quit |
 
-From a terminal: `viola-landlord --host` hosts a network game,
-`viola-landlord --join HOST` joins one (HOST as in section 18),
-`viola-landlord --local` plays at this screen; with none of them the game asks.
+From a terminal: `XLandlord --host` hosts a network game,
+`XLandlord --join HOST` joins one (HOST as in section 18),
+`XLandlord --local` plays at this screen; with none of them the game asks.
 
 In dialogs, Enter presses the button with the black focus box; Tab and the
 arrow keys move it; Esc backs out; an underlined letter presses its button; in

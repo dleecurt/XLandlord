@@ -1,5 +1,5 @@
 /*
- * Viola the Landlord - The Landlord's Game for X11
+ * XLandlord - The Landlord's Game for X11
  * Copyright (C) 2026 Lee Curtis
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
@@ -176,7 +176,7 @@ const char *const help_network[] = {
     "NETWORK PLAY: ONE HOST, UP TO THREE JOINERS, OVER SSH",
     "",
     "At start-up the game asks: Host a Network Game, Join a Network",
-    "Game, or Play Here. (viola-landlord --host, --join HOST or --local",
+    "Game, or Play Here. (XLandlord --host, --join HOST or --local",
     "on the command line skips the question.)",
     "",
     "Hosting  Game > Host a Network Game. Choose the computer player's",
@@ -195,7 +195,7 @@ const char *const help_network[] = {
     "         machine a joiner's ssh connection came from, found in the",
     "         host's /etc/hosts or DNS; its IP address if it has no name.",
     "         Your game runs",
-    "             ssh -T -o BatchMode=yes user@host viola-landlord --relay 1904",
+    "             ssh -T -o BatchMode=yes user@host XLandlord --relay 1904",
     "         and plays through that connection. You see the same board",
     "         and the same dialogs; on your turn the buttons work.",
     "",
@@ -206,9 +206,9 @@ const char *const help_network[] = {
     "         computer player (medium) takes over his seat.",
     "",
     "WHAT YOU NEED",
-    "  - Viola the Landlord, the same version, on every machine.",
+    "  - XLandlord, the same version, on every machine.",
     "  - ssh from each joiner to the host WITHOUT a password (a key).",
-    "  - viola-landlord on the host's PATH for non-interactive ssh, or",
+    "  - XLandlord on the host's PATH for non-interactive ssh, or",
     "    its full path as net_command in the joiner's preferences.conf.",
     "",
     "SETTING UP PASSWORD-LESS SSH (on each joiner's machine)",
@@ -218,7 +218,7 @@ const char *const help_network[] = {
     "  2. Copy it to the host (asks the host password one last time):",
     "         ssh-copy-id user@host",
     "  3. Check: this must print the version without asking anything:",
-    "         ssh -o BatchMode=yes user@host viola-landlord --version",
+    "         ssh -o BatchMode=yes user@host XLandlord --version",
     "  If it fails: the host needs an ssh server (sshd) running;",
     "  ~/.ssh must be mode 700 and ~/.ssh/authorized_keys mode 600 on",
     "  the host; accept the host key once with a plain ssh user@host.",
@@ -249,7 +249,7 @@ const char *const help_keys[] = {
 };
 
 const char *const help_license[] = {
-    "Viola the Landlord",
+    "XLandlord",
     "Copyright (C) 2026 Lee Curtis",
     "",
     "This program is free software: you can redistribute it and/or modify",

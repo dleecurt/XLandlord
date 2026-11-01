@@ -1,22 +1,22 @@
-.\" Viola the Landlord - The Landlord's Game for X11
+.\" XLandlord - The Landlord's Game for X11
 .\" Copyright (C) 2026 Lee Curtis
 .\" SPDX-License-Identifier: GPL-3.0-or-later
-.TH VIOLA-LANDLORD 6 "2026" "viola-landlord @VERSION@" "Games"
+.TH XLANDLORD 6 "2026" "XLandlord @VERSION@" "Games"
 .SH NAME
-viola-landlord \- The Landlord's Game (Lizzie J. Magie, 1904) against the computer, for X11
+XLandlord \- The Landlord's Game (Lizzie J. Magie, 1904) against the computer, for X11
 .SH SYNOPSIS
-.B viola-landlord
+.B XLandlord
 .RB [ \-\-host " | " \-\-join
 .IR host " | "
 .BR \-\-local ]
 .br
-.B viola-landlord
+.B XLandlord
 .RB [ \-\-version " | " \-\-help ]
 .br
 .B viola\-landlord \-\-relay
 .I port
 .SH DESCRIPTION
-.B Viola the Landlord
+.B XLandlord
 plays
 .IR "The Landlord's Game" ,
 the board game patented by Lizzie J. Magie in 1904 (US Patent 748,626)
@@ -141,9 +141,9 @@ the menu bar; Alt+G, Alt+O, Alt+H open a menu
 new game / quit
 .SH FILES
 .TP
-.I $XDG_CONFIG_HOME/viola-landlord/preferences.conf
+.I $XDG_CONFIG_HOME/xlandlord/preferences.conf
 (normally
-.IR ~/.config/viola-landlord/preferences.conf )
+.IR ~/.config/xlandlord/preferences.conf )
 the seats
 .RI ( seat1 " .. " seat4 :
 empty, human, easy, medium, hard), the human players' names

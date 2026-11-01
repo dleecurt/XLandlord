@@ -1,10 +1,10 @@
 [Desktop Entry]
 Type=Application
-Name=Viola the Landlord
+Name=XLandlord
 GenericName=Board Game
 Comment=The Landlord's Game (Lizzie J. Magie, 1904) against the computer
-Exec=viola-landlord
-Icon=viola-landlord
+Exec=XLandlord
+Icon=xlandlord
 Terminal=false
 Categories=Game;BoardGame;
 Keywords=landlord;monopoly;board;magie;georgism;

@@ -1,5 +1,5 @@
 /*
- * Viola the Landlord - The Landlord's Game for X11
+ * XLandlord - The Landlord's Game for X11
  * Copyright (C) 2026 Lee Curtis
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
@@ -20,7 +20,7 @@
 
 /* tests/net.c - network play, end to end, without a real ssh:
  *
- *   This program also plays the part of ssh: VIOLA_LANDLORD_SSH points at
+ *   This program also plays the part of ssh: XLANDLORD_SSH points at
  *   it, and when it is started with ssh's arguments it runs the relay, as
  *   sshd would on the host. So every byte goes the real way:
  *   joiner -> "ssh" -> relay -> host's localhost socket.
@@ -281,7 +281,7 @@ int main(int argc, char **argv)
     if (argc >= 3 && !strcmp(argv[argc - 2], "--relay")) return net_relay(atoi(argv[argc - 1]));
 
     if (!realpath(argv[0], self)) { perror("realpath"); return 1; }
-    setenv("VIOLA_LANDLORD_SSH", self, 1);
+    setenv("XLANDLORD_SSH", self, 1);
     port = 20000 + (int)(getpid() % 20000);
 
     formats();

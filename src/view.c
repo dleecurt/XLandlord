@@ -1,5 +1,5 @@
 /*
- * Viola the Landlord - The Landlord's Game for X11
+ * XLandlord - The Landlord's Game for X11
  * Copyright (C) 2026 Lee Curtis
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
@@ -475,7 +475,7 @@ static void draw_board(int x, int y, int S)
         const char *t1 = "THE LANDLORD'S GAME";
         int tw = xw_text_width(XF_LOGO, t1, (int)strlen(t1));
         xw_text(XF_LOGO, x + (S - tw) / 2, cy, t1, (int)strlen(t1), XC_INK);
-        centered_lines(XF_UI, "Viola the Landlord\n\nGame > New Game (Ctrl+N) to begin.",
+        centered_lines(XF_UI, "XLandlord\n\nGame > New Game (Ctrl+N) to begin.",
                        x, S, cy + 16, XC_INK);
     }
 }

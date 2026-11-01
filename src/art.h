@@ -1,5 +1,5 @@
 /*
- * Viola the Landlord - The Landlord's Game for X11
+ * XLandlord - The Landlord's Game for X11
  * Copyright (C) 2026 Lee Curtis
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
@@ -20,7 +20,7 @@
 
 /* art.h - the game's pictures.
  *
- * Every picture here is original pixel art drawn for Viola the Landlord as
+ * Every picture here is original pixel art drawn for XLandlord as
  * rows of characters ('#' ink, '+' a second color, anything else clear), and
  * is distributed under the same license as the program (GPL-3.0-or-later);
  * the author also dedicates them to the public domain (CC0 1.0) for use

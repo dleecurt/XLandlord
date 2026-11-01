@@ -1,5 +1,5 @@
 /*
- * Viola the Landlord - The Landlord's Game for X11
+ * XLandlord - The Landlord's Game for X11
  * Copyright (C) 2026 Lee Curtis
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
@@ -26,9 +26,9 @@
  *   listens for players on 127.0.0.1 only - never on the network. The others
  *   join over ssh: the joiner's program runs
  *
- *       ssh -T -o BatchMode=yes [user@]host viola-landlord --relay PORT
+ *       ssh -T -o BatchMode=yes [user@]host XLandlord --relay PORT
  *
- *   and the relay, a copy of viola-landlord started by ssh on the host,
+ *   and the relay, a copy of XLandlord started by ssh on the host,
  *   connects to the hosting game on localhost and copies bytes both ways.
  *   ssh does the authentication and the encryption; the game never opens a
  *   port to the outside. (Password-less ssh keys are assumed: see README.)
@@ -251,7 +251,7 @@ int net_local_addresses(char *out, size_t size);
  * looked up first (net_resolve), so a name that is in neither DNS nor the
  * hosts file gets a clear message before ssh is started; ssh is then given
  * the name as typed, so its known_hosts entry for that name still applies. `remote_cmd` is the program to run there (normally
- * "viola-landlord"). The environment variable VIOLA_LANDLORD_SSH replaces
+ * "XLandlord"). The environment variable XLANDLORD_SSH replaces
  * "ssh" (the tests use it). Returns 0 once WELCOMEd, or -1 with the reason
  * (ssh's own error, or the host's REFUSE) in err. */
 int  net_join(const char *host, int port, const char *remote_cmd, const char *name,
@@ -261,7 +261,7 @@ int  net_join(const char *host, int port, const char *remote_cmd, const char *na
 int  net_client_recv(NetMsg *m, int ms);
 int  net_client_send(NetMsgKind kind, const int *num, int nnum, const char *text);
 
-/* ---- the relay (viola-landlord --relay PORT, started by ssh) ---- */
+/* ---- the relay (XLandlord --relay PORT, started by ssh) ---- */
 
 /* Connect to the game hosted on this machine and copy stdin to it and its
  * output to stdout until either side closes. Returns the exit status. */

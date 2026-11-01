@@ -1,5 +1,5 @@
 /*
- * Viola the Landlord - The Landlord's Game for X11
+ * XLandlord - The Landlord's Game for X11
  * Copyright (C) 2026 Lee Curtis
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
@@ -308,8 +308,8 @@ int xw_open(void)
     dpy = XOpenDisplay(NULL);
     if (!dpy) {
         const char *d = getenv("DISPLAY");
-        fprintf(stderr, "viola-landlord: cannot open the X display %s\n"
-                        "(Viola the Landlord is an X11 program: run it inside an X session, or set DISPLAY.)\n",
+        fprintf(stderr, "XLandlord: cannot open the X display %s\n"
+                        "(XLandlord is an X11 program: run it inside an X session, or set DISPLAY.)\n",
                 d && *d ? d : "(DISPLAY is not set)");
         return 0;
     }
@@ -322,7 +322,7 @@ int xw_open(void)
     fonts[XF_FIXED] = load_font(fixed_names);
     fonts[XF_LOGO] = load_font(logo_names);
     if (!fonts[XF_UI] || !fonts[XF_FIXED]) {
-        fprintf(stderr, "viola-landlord: no usable X font found (install xfonts-base)\n");
+        fprintf(stderr, "XLandlord: no usable X font found (install xfonts-base)\n");
         XCloseDisplay(dpy);
         return 0;
     }
@@ -404,8 +404,8 @@ void xw_show(int argc, char **argv, int w, int h)
     sh->width = W;
     sh->height = H;
     XClassHint *ch = XAllocClassHint();
-    ch->res_name = "viola-landlord";
-    ch->res_class = "ViolaLandlord";
+    ch->res_name = "XLandlord";
+    ch->res_class = "XLandlord";
     set_icons();
     XWMHints *wh = XAllocWMHints();
     wh->flags = InputHint | StateHint | IconPixmapHint | IconMaskHint;
@@ -421,7 +421,7 @@ void xw_show(int argc, char **argv, int w, int h)
     gc = XCreateGC(dpy, win, 0, NULL);
     XSelectInput(dpy, win, ExposureMask | KeyPressMask | ButtonPressMask | StructureNotifyMask);
     make_back();
-    xw_set_title("Viola the Landlord");
+    xw_set_title("XLandlord");
     XMapWindow(dpy, win);
     for (;;) {                  /* wait until it is on screen, so the first drawing is not lost */
         XEvent ev;
