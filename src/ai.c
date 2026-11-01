@@ -39,6 +39,7 @@
 
 /* The level (DIFF_*) of computer player p. */
 static int diff(const Game *g, int p) { return g->pl[p].difficulty; }
+/* True pct times in a hundred (the Easy player's impulses). */
 static int chance_pct(Game *g, int pct) { return game_random(g, 100) < pct; }
 
 /* Trips round the board left before someone draws his last wages (at least

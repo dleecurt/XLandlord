@@ -56,6 +56,7 @@ static void consistent(const Game *g)
     }
 }
 
+/* The game's "changed" hook in the tests: check after every change. */
 static void check_hook(Game *g) { consistent(g); }
 
 /* Play one game; returns the winner. */

@@ -96,6 +96,7 @@ static const char *kind_word(SpaceType t)
     }
 }
 
+/* Write the board map as SVG to standard output. */
 int main(void)
 {
     printf("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"

@@ -20,11 +20,23 @@
 
 /* main.c - XLandlord: start-up, the main loop and the commands.
  *
+ * START-UP
+ *   The player's name in the game (asked every time; never the login
+ *   name), then the first question: host a network game, join one, or play
+ *   at this screen (--host, --join HOST, --local skip it).
+ *
  * THE MAIN LOOP
  *   While a game is on: if it is a computer player's turn, play it (the
  *   game's hooks redraw the window and pause so the moves can be watched);
- *   if it is the human's turn, wait for a key, a click or a menu command.
- *   The Roll command plays the human's turn; dialogs ask his choices. */
+ *   if it is a human's turn at this screen, wait for a key, a click or a
+ *   menu command. The Roll command plays the human's turn; dialogs ask his
+ *   choices.
+ *   Hosting, a joiner's turn is played through net_decider (net.c), which
+ *   waits for his machine - and for him to come back if his connection
+ *   dropped. A joiner's loop only draws what the host sends, answers its
+ *   questions and sends his own actions (netui.c).
+ *   Under every dialog, xw_set_idle(netui_tick) keeps the network going:
+ *   the host notices arrivals and departures, a joiner's answer timer runs. */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -55,11 +67,13 @@ static int final_shown;         /* the final standings have been shown for this 
 
 /* ---- for the menus ---- */
 
+/* See app.h: whether the menu items may be used now. */
 int app_can_act(void) { return app.playing && app.human_turn && !app.game.over; }
 int app_can_propose(void) { return app_can_act() && !app.game.single_tax; }
 int app_bids_on(void) { return app.prefs.ask_bids; }
 int app_confirm_on(void) { return app.prefs.confirm_cpu; }
 
+/* The game's "changed" hook at this screen: draw everything again. */
 static void redraw(void) { view_draw(); }
 
 /* ---- the game's hooks ---- */
@@ -152,6 +166,7 @@ static int humans_in_game(const Game *g)
     return n;
 }
 
+/* See app.h: how many humans play at this screen (1 for a joiner). */
 int app_local_humans(void) { return app.playing ? humans_in_game(&app.game) : 1; }
 
 /* Is player p played at another machine (a joiner, connected or away and
@@ -743,12 +758,14 @@ static void cmd_about(void)
     ui_message("About XLandlord",
                "XLandlord " PACKAGE_VERSION_STR "\n\n"
                "The Landlord's Game, invented by Lizzie J. Magie (US Patent 748,626, 1904), played by the rules "
-               "of 1906 with the Single Tax, against the computer, in the style of the Viola browser.\n\n"
+               "of 1906 with the Single Tax: against the computer, with others at this screen, or over the "
+               "network through ssh, in the style of the Viola browser.\n\n"
                "Copyright (C) 2026 Lee Curtis. Free software under the GNU GPL, version 3 or later.");
 }
 
 /* ---- network play ---- */
 
+/* Close any network game this program is part of (BYE with `why`). */
 static void leave_network(const char *why)
 {
     if (net_role() != NET_NONE) net_close(why);
@@ -774,13 +791,11 @@ static void cmd_net_join(void)
     netui_join(NULL);
 }
 
-/* Roll Dice: play the current human's turn (a joiner asks the host to). */
-/* The first question at start-up: host a network game, join one, or play
- * at this screen. `mode` comes from the command line (--host, --join,
- * --local) and skips the question; `join_host` is --join's host. */
+/* How the game was started: ask how to play, or what --host, --join or
+ * --local on the command line chose. */
 typedef enum { START_ASK, START_HOST, START_JOIN, START_LOCAL } StartMode;
 
-/* See main.c's start_up: the player's name in the game, asked at every
+/* The first thing at start-up (see start_up): the player's name in the game, asked at every
  * start (the one used last time is filled in; Enter keeps it). It is the
  * player's identity at this screen and in network games, and has nothing
  * to do with the system's user name (which only ssh uses). An empty name
@@ -805,6 +820,10 @@ static int ask_own_name(void)
     }
 }
 
+/* Start-up: the player's name, then the first question - host a network
+ * game, join one, or play at this screen. `mode` comes from the command
+ * line (--host, --join, --local) and skips the question; `join_host` is
+ * --join's host. */
 static void start_up(StartMode mode, const char *join_host)
 {
     /* Who is playing: asked before anything else, every time. */
@@ -833,6 +852,7 @@ static void start_up(StartMode mode, const char *join_host)
     }
 }
 
+/* Roll Dice: play the current human's turn (a joiner asks the host to). */
 static void roll(void)
 {
     if (!app_can_act()) return;

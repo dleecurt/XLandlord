@@ -148,6 +148,7 @@ static XFontStruct *load_font(const char *const *names)
     return NULL;
 }
 
+/* See xwin.h. */
 int xw_ascent(int font)  { return fonts[font]->ascent; }
 int xw_descent(int font) { return fonts[font]->descent; }
 
@@ -176,6 +177,7 @@ void xw_fill(int x, int y, int w, int h, int color)
     XFillRectangle(dpy, back, gc, x, y, (unsigned)w, (unsigned)h);
 }
 
+/* See xwin.h: one-pixel lines. */
 void xw_hline(int x, int y, int w, int color) { xw_fill(x, y, w, 1, color); }
 void xw_vline(int x, int y, int h, int color) { xw_fill(x, y, 1, h, color); }
 
@@ -198,6 +200,7 @@ static void bevel(int x, int y, int w, int h, int tl, int br)
     }
 }
 
+/* See xwin.h: Viola's two bevels, light over dark or dark over light. */
 void xw_raised(int x, int y, int w, int h) { bevel(x, y, w, h, XC_LIGHT, XC_DARK); }
 void xw_sunken(int x, int y, int w, int h) { bevel(x, y, w, h, XC_DARK, XC_LIGHT); }
 
@@ -345,6 +348,7 @@ void xw_clip(int x, int y, int w, int h)
     XSetClipRectangles(dpy, gc, 0, 0, &r, 1, Unsorted);
 }
 
+/* See xwin.h. */
 void xw_clip_off(void) { XSetClipMask(dpy, gc, None); }
 
 /* ---- the window ---- */
@@ -367,6 +371,7 @@ void xw_flush(void)
     XFlush(dpy);
 }
 
+/* See xwin.h. */
 void xw_bell(void) { XBell(dpy, 0); XFlush(dpy); }
 
 /* See xwin.h. */
@@ -614,13 +619,14 @@ static int handle(XEvent *ev)
     }
 }
 
-/* See xwin.h. */
 static int (*idle_fn)(void);    /* xw_set_idle */
 static int idle_every = 250, in_idle_fn;
 
 /* See xwin.h. */
 void xw_set_idle(int (*fn)(void), int ms) { idle_fn = fn; idle_every = MAX(20, ms); }
 
+/* See xwin.h: the next key, click or window event, waiting as long as it
+ * takes (calling the idle function meanwhile, if one is set). */
 int xw_next_key(void)
 {
     for (;;) {

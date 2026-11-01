@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.0.13 - 2026-11-01
+
+Documentation, rules and comments brought up to date with 0.0.10 - 0.0.12:
+
+- README: the name prompt described for every game (not only network
+  play); hosting lists the timers; a Names paragraph (login name vs. player
+  name, no duplicates); rejoining after a drop is the one way into a game
+  under way; the source-layout table brought up to date.
+- Rule book (and PDF): a screenshot of the name prompt; section 20 now
+  records the decisions made for play with the computer and over the
+  network (one computer player and who sets its skill, names, starting
+  money, leaving, dropped connections, answer time, the host); a Network
+  line on the quick-reference page.
+- Man page: playing at the screen mentions the name prompt and seat 1.
+- INSTALL: the ssh user vs. the player's name; troubleshooting for a
+  different version, Name Taken, Connection Lost and Are You Still There.
+- Help > About mentions playing with others at the screen and over the
+  network.
+- Code comments: every function has its comment again (some had been
+  separated from their functions by later edits); the overviews at the top
+  of main.c, game.c and netui.h describe start-up, players leaving, the
+  network timers and reconnecting.
+
 ## 0.0.12 - 2026-11-01
 
 - The player's name in the game is no longer the system's user name. At

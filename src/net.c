@@ -186,6 +186,7 @@ int net_decode_state(Game *g, const int *num, int n)
     return 0;
 }
 
+/* See net.h: a sale (to the pack, a house, to a computer player) as one number. */
 int net_sale_encode(int kind, int sp, int buyer) { return (kind & 3) | (sp << 2) | ((buyer + 1) << 8); }
 
 /* See net.h: the reverse of net_sale_encode. */
@@ -296,8 +297,10 @@ void net_client_close(const char *why);
 /* See net.h: whether this program hosts, has joined, or neither; and the
  * function that keeps the window alive during network waits. */
 NetRole net_role(void) { return role; }
+/* See net.h. */
 void net_set_idle(int (*idle)(void)) { idle_fn = idle; }
 
+/* Keep the window alive during a wait; 1 if the player asked to stop. */
 static int idle(void) { return idle_fn ? idle_fn() : 0; }
 
 /* ==== hosting ==== */
@@ -350,6 +353,7 @@ void net_set_timers(int rsecs, int asecs)
     reconnect_secs = CLAMP(rsecs, 1, 3600);
     answer_secs = CLAMP(asecs, 1, 3600);
 }
+/* See net.h. */
 void net_set_warning(int wsecs, int gsecs) { warn_secs = MAX(0, wsecs); grace_secs = MAX(0, gsecs); }
 void net_set_wait_hook(int (*hook)(int p, int why, int secs)) { wait_hook = hook; }
 
@@ -380,6 +384,7 @@ const char *net_host_event(void)
     return events[events_read++ % 8];
 }
 
+/* See net.h: who is in the waiting room. */
 int net_lobby_count(void) { return nlobby; }
 const char *net_lobby_name(int i) { return i >= 0 && i < nlobby ? conns[lobby[i]].name : ""; }
 
@@ -424,6 +429,8 @@ static void own_label(char *out, size_t size)
     if (gethostname(h, sizeof h - 1) != 0 || !h[0]) copy_str(h, sizeof h, "this machine");
     copy_str(out, size, h);
 }
+/* See net.h: whose seat is played on another machine, and whether he is
+ * connected just now. */
 int net_seat_remote(int p) { return role == NET_HOST && p >= 0 && p < MAXPLAYERS && seat_remote[p]; }
 int net_seat_connected(int p) { return net_seat_remote(p) && seat_conn[p] >= 0 && conns[seat_conn[p]].open; }
 
@@ -760,6 +767,7 @@ void net_build_table(GameSettings *s, const char *hname, int cpu_difficulty)
     lobby_open = 0;
 }
 
+/* See net.h. */
 void net_set_host_name(const char *name) { copy_str(host_name, sizeof host_name, name); }
 
 /* See net.h: START and PLAYER to every joiner, then the first STATE. */
@@ -1184,6 +1192,8 @@ static void addr_text(const struct sockaddr *sa, char *out, size_t size)
         out[0] = '\0';
 }
 
+/* See net.h: look a host up the way the system does (the hosts file and
+ * DNS, as nsswitch.conf orders them); an IP address is taken as it is. */
 int net_resolve(const char *host, char *found, size_t fsize, char *err, size_t errsize)
 {
     struct addrinfo hints, *res = NULL;
@@ -1228,6 +1238,8 @@ int net_resolve(const char *host, char *found, size_t fsize, char *err, size_t e
     return 0;
 }
 
+/* See net.h: this machine's IP addresses for the waiting room, loopback
+ * and link-local ones left out. */
 int net_local_addresses(char *out, size_t size)
 {
     struct ifaddrs *list = NULL;

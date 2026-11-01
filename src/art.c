@@ -390,6 +390,7 @@ static const char *const *const pictures[ART_COUNT] = {
 /* See art.h. */
 const char *const *art_rows(ArtId id) { return pictures[id]; }
 
+/* See art.h. */
 int art_width(ArtId id) { return (int)strlen(pictures[id][0]); }
 
 /* The number of rows in a picture. */

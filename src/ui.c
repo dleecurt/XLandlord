@@ -37,11 +37,13 @@ int ui_hit(UiRect r, int x, int y)
     return x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h;
 }
 
+/* The height of a dialog's title with its etched line. */
 static int title_height(void) { return xw_line_height(XF_UI) + 12; }
 
 /* See ui.h. */
 int ui_title_height(void) { return title_height(); }
 
+/* Return or keypad Enter. */
 static int is_enter(int k) { return k == '\n' || k == '\r'; }
 
 /* See ui.h: draw the game, then an empty dialog panel with its title;

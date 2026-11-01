@@ -273,6 +273,7 @@ static int wait_child(pid_t pid)
     return -1;
 }
 
+/* The hosted game's "changed" hook in the tests: send the new state. */
 static void broadcast(Game *g) { net_broadcast(g); }
 
 /* Seat the table, play the game to its end; returns the number of

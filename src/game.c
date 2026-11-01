@@ -29,7 +29,10 @@
  *      the Chances, the official pass on a double, the choice to stay put
  *      rather than speculate;
  *   5. the space is settled (land): rent, fares, taxes, cards, luxuries...
- *   6. the game ends when someone has received his wages end_wages times.
+ *   6. the game ends when someone has received his wages end_wages times,
+ *      or when fewer than two players are left at the table;
+ *   7. the dice pass to the next player still at the table: one who has
+ *      left the game (game_player_leaves) holds nothing and is skipped.
  *
  * Money: the MISCELLANEOUS pile is the bank, it never runs out. The PUBLIC
  * TREASURY collects sale prices, taxes and fines; under the Single Tax it
@@ -123,6 +126,7 @@ void game_new(Game *g, const GameSettings *s)
     shuffle(g, g->chance_deck, MIN(nchance_cards, 32));
 }
 
+/* See game.h: who answers player p's questions. */
 void game_set_decider(Game *g, int p, const Decider *d) { g->dec[p] = d; }
 
 /* ---- questions ---- */
@@ -161,6 +165,7 @@ static int rails_owned(const Game *g, int p)
     return n;
 }
 
+/* Is p one of the two partners of the railroad TRUST? */
 static int in_trust(const Game *g, int p) { return p >= 0 && (p == g->trust_a || p == g->trust_b); }
 
 /* See game.h: $5 for one railroad, $10 / $20 / $50 with two, three, four
@@ -300,6 +305,7 @@ static void transfer(Game *g, int from, int to, int amount)
     }
 }
 
+/* Money to p from the bank (nothing to one who has left the game). */
 static void collect(Game *g, int p, int amount) { if (!g->pl[p].left) g->pl[p].cash += amount; }
 
 /* Has p anything left to sell to raise money? */
@@ -909,6 +915,10 @@ void game_player_leaves(Game *g, int p)
     if (g->hooks.changed) g->hooks.changed(g);
 }
 
+/* See game.h: one whole turn of the current player - out of the Poor
+ * House or off a Natural Opportunity, his business before the throw, Jail
+ * or the throw and the move - then the check for the end of the game and
+ * the dice to the next player still at the table. */
 void game_turn(Game *g)
 {
     if (g->over) return;

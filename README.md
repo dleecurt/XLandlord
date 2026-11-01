@@ -45,7 +45,7 @@ installed where, uninstalling, network-play requirements and troubleshooting.
 guide, with screenshots, a numbered board map and a quick-reference page; the
 same document is in **[docs/xlandlord-rules.pdf](docs/xlandlord-rules.pdf)**
 for printing. Both are installed in `$(prefix)/share/doc/xlandlord`. The
-PDF (18 pages, its last a one-page quick reference) is the one to print:
+PDF (19 pages, its last a one-page quick reference) is the one to print:
 `xdg-open /usr/local/share/doc/xlandlord/xlandlord-rules.pdf`, or
 `lp` the same file. `make pdf` rebuilds it after editing `docs/RULES.md`
 (see [INSTALL.md](INSTALL.md), section 9). Help > The Rules of 1906 and
@@ -69,17 +69,24 @@ arrow keys) turn the pages.
 
 Without the 75dpi fonts the game still runs; X picks the nearest fonts it has.
 
-Current version: **0.0.12** (see `CHANGELOG.md`).
+Current version: **0.0.13** (see `CHANGELOG.md`).
 
 ## Playing
 
-A new game starts with the **New Game** form: four seats, each **Empty,
+The game first asks **your name**: the name you play under, shown to the
+other players and used in network games. It is never taken from your login
+name; the one used last time is filled in, so Enter keeps it (Cancel quits).
+Then it asks how you want to play: host a network game, join one, or play
+here.
+
+A game here starts with the **New Game** form: four seats, each **Empty,
 Human or Computer** (two to four players, at least one human, and **one
 computer player at most**), the **computer skill** for the game (Easy,
 Medium or Hard), how
 many times a player draws his wages before the game ends (the 1906 rules say
 five) and the rules (standard, or the 1906 "advanced and scientific" rules).
-Each other human seat is asked for its player's name. Then the cards are dealt
+Seat 1 is you; each other human seat is asked for its player's name. Then
+the cards are dealt
 (Rule 1) and each player ticks the ones he wants to buy.
 
 ### Several players at one screen (hot-seat)
@@ -101,10 +108,7 @@ One player **hosts** and up to three others **join** from their own machines.
 The connection goes through **ssh**; the game itself never opens a port to the
 network.
 
-**Starting up.** When the program starts it first asks **your name** - the
-name you play under, shown to everyone and used in network games. It is
-never taken from your login name; the name used last time is filled in, so
-Enter keeps it. (Cancel quits.) Then it asks how you want to play:
+**Starting up.** After your name, the program asks how you want to play:
 **Host a Network Game**, **Join a Network Game**, or **Play Here** (at this
 screen, against the computer or hot-seat). The same choices are in the Game
 menu at any time. To skip the question, start it with an option:
@@ -116,12 +120,14 @@ XLandlord --join lee@gamebox     # ... by host name, as user lee
 XLandlord --local                # play at this screen
 ```
 
-**Hosting.** Game > Host a Network Game. Choose the strength of the computer
-player, the length of the game, the rules and a port (1904 by default; it is
+**Hosting.** Game > Host a Network Game. The host sets the game up for
+everyone: the computer player's skill, the length of the game, the rules,
+how long to wait for a player whose connection drops, and how long players
+have to answer (both 1, 2 or 5 minutes), then a port (1904 by default; it is
 only reachable from the host's own machine). A waiting room lists who has
 joined; press **Start Game** when everyone is in.
 
-**Hosting.** The waiting room shows how to reach this machine: its host name
+**Reaching the host.** The waiting room shows how to reach this machine: its host name
 and its IP addresses (loopback and link-local addresses are left out), for
 example `lee@gamebox (or the IP address: 192.168.1.20 / 2001:db8::5)`.
 
@@ -135,6 +141,12 @@ e.g. `Ann (from annbox)`, `Bea (from 203.0.113.45)`.
 **Joining.** Join a Network Game, and enter the host's address. You see the
 same board and the same dialogs as at the host; on your turn the Roll / Build /
 Trade buttons work. The menus and dialogs say whose turn it is.
+
+**Names.** Everyone is known at the table by the name he gave at start-up,
+not by his login name (which only ssh uses, to log in to the host). No two
+players may share a name, whatever the letter case: a joiner whose name is
+taken - by the host or by someone already waiting - is told so and asked for
+another, and his game joins again with it.
 
 **Giving the host's address.** Type the host's **IP address** (IPv4 such as
 `192.168.1.20`, or IPv6 such as `2001:db8::5`) or its **host name** (such as
@@ -158,7 +170,8 @@ for an IPv6 address with a port, put the address in brackets:
 
 - Four players at most: the host and three joiners. A fifth player who tries to
   join is turned away with a warning ("The table is full..."); so is anyone who
-  tries to join a game that has already started.
+  tries to join a game that has already started (except a player coming back
+  after a dropped connection).
 - If fewer than four humans play, **one** computer player takes a free seat,
   at the skill the host chose; joiners have no say in it. With four humans
   there is no computer player: a fourth human who joins before the start
@@ -374,10 +387,10 @@ Only public-domain material or art made for this program is used:
 | ---- | ------------ |
 | `src/board.c` | the board and the Chance cards, as data |
 | `src/game.c` | the rules engine (no X): turns, money, the Single Tax |
-| `src/ai.c` | the computer players, Easy / Medium / Hard |
+| `src/ai.c` | the computer player's three levels, Easy / Medium / Hard |
 | `src/human.c` | the human players' choices, as dialogs; trades between humans |
-| `src/net.c` | network play: localhost listener, ssh-started relay, joiner's ssh pipe, protocol, network seats |
-| `src/netui.c` | network play's windows: host setup and waiting room, Join, the joiner's game |
+| `src/net.c` | network play: localhost listener, ssh-started relay, joiner's ssh pipe, protocol, network seats, the reconnect and answer timers |
+| `src/netui.c` | network play's windows: host setup, waiting rooms, the host's waiting panel, Join, the joiner's game, "Are you still there?", reconnecting |
 | `src/view.c` | drawing the board and the panel |
 | `src/ui.c` | Viola dialogs: messages, lists, check lists, forms, number entry |
 | `src/menubar.c` | the Viola menu bar |
@@ -386,15 +399,15 @@ Only public-domain material or art made for this program is used:
 | `src/help.c` | the Help texts |
 | `src/guide.c` | Help > How to Play, the illustrated guide |
 | `src/guidepics.c` | its screenshots, compiled in (made by `make guide-pics`) |
-| `docs/guide/*.png` | the guide's screenshots, the source of `src/guidepics.c` |
-| `docs/guidepics.c` | turns them into `src/guidepics.c` |
-| `XLandlord.6.in` | the manual page |
 | `src/prefs.c` | the preferences file |
-| `src/main.c` | start-up, the main loop, the commands |
-| `tests/engine.c` | `make check`: computer-only games and consistency checks |
+| `src/main.c` | start-up (the player's name, how to play), the main loop, the commands |
+| `XLandlord.6.in` | the manual page |
 | `docs/RULES.md` | the rule book and how-to-play guide (source of the PDF) |
 | `docs/boardmap.c` | writes the numbered board map for the rules from `src/board.c` |
-| `tests/net.c` | `make check`: network games end to end through a stand-in for ssh (table limit, no CPU with four humans, dropped players) |
+| `docs/guide/*.png` | the guide's screenshots, the source of `src/guidepics.c` |
+| `docs/guidepics.c` | turns them into `src/guidepics.c` |
+| `tests/engine.c` | `make check`: computer-only games, consistency checks, a player leaving mid-game |
+| `tests/net.c` | `make check`: network games end to end through a stand-in for ssh (table limit, no computer player with four humans, quitting, reconnecting, a player who stops answering, names taken) |
 
 ## License
 

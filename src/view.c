@@ -70,6 +70,7 @@ void view_set_status(const char *fmt, ...)
     va_end(ap);
 }
 
+/* See view.h. */
 void view_set_focus(PanelButton b) { focus = b; }
 
 /* See view.h. */
@@ -78,6 +79,7 @@ void view_scroll_log(int n)
     log_scroll = n ? MAX(0, log_scroll + n) : 0;
 }
 
+/* See app.h: player p's color (red, blue, green, brass). */
 int app_player_color(int p) { return XC_PLAYER0 + (p & 3); }
 
 /* ---- board geometry ---- */

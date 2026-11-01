@@ -3,7 +3,7 @@
 *Lizzie J. Magie's game of 1904, by the rules of 1906, with the Single Tax,
 for one to four players at one screen or over the network.*
 
-XLandlord 0.0.12. Copyright (C) 2026 Lee Curtis. This document is
+XLandlord 0.0.13. Copyright (C) 2026 Lee Curtis. This document is
 part of the program and is free under the GNU General Public License,
 version 3 or later; the rules it describes are those of the public-domain 1904
 patent and 1906 rule book.
@@ -95,6 +95,8 @@ under, shown to the other players and used in network games. It is never
 taken from your login name on the computer. The name you used last time is
 filled in, so Enter keeps it; an empty name is not accepted, and Cancel
 quits.
+
+![Your name in the game.](images/name-prompt.png)
 
 Then it asks how you want to play:
 
@@ -636,6 +638,29 @@ emergencies "to be settled among the players". This edition settles them so:
 - **Houses**: nine at most on a lot under the standard rules.
 - **Single Tax Rule 8**: the Natural Opportunity pays $50.
 
+The 1906 game was played round one table; playing with the computer and
+over the network needed some decisions of its own:
+
+- **One computer player at most**, and its skill is set for the whole game by
+  whoever sets the game up (the host, in a network game); no player chooses
+  a skill for himself, nor for the computer player.
+- **Names**: each player gives the name he plays under when the program
+  starts; it is never taken from his login name. No two players at a network
+  table may share a name.
+- **Starting money** is set once, by the 1906 table, for the players seated
+  when the game starts, and never changes afterward.
+- **Leaving**: a player who leaves a network game is out of it. His cards go
+  back into the pack, his houses come down, and his cash goes with him (it
+  cannot fairly be shared out); nobody takes his seat, and no newcomer may
+  join a game under way. The computer player stays to the end. With one
+  player left, the game is over.
+- **A dropped connection** is not leaving: the seat waits for the time the
+  host chose, and the player may come back.
+- **Taking too long**: after the host's answer time a player is asked whether
+  he is still there, and one minute later he is taken out of the game.
+- **The host** runs the only copy of the game, so when he leaves the game is
+  over for everyone.
+
 ## 21. Sources
 
 - US Patent 748,626, *Game-Board*, Lizzie J. Magie, January 5, 1904 (public
@@ -678,6 +703,7 @@ chosen). **Worth:** cash + 100 for each card, house, luxury and Professor card.
 | Raising money | to the pack at half price; houses $50; to a computer player at his offer |
 | Poor House | when you cannot pay at all; until your next turn |
 | Single Tax | 2 votes; land rent to the Treasury; each $50 frees a utility, then builds a college, then raises wages $10 |
+| Network | host + up to 3; one computer player at most; names unique; a quitter's cards go back to the pack |
 
 | Key | | Key | |
 | --- | --- | --- | --- |

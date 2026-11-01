@@ -18,9 +18,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* netui.h - the window side of network play: the host's setup form and
- * lobby, the joiner's Join dialog and waiting room, and the joiner's game
- * (drawing what the host sends, answering its questions). */
+/* netui.h - the window side of network play: the host's setup form (the
+ * computer player's skill and the two timers) and lobby, the host's panel
+ * while he waits for an absent or silent player (with Remove), the
+ * joiner's Join dialog (asking another name if his is taken) and waiting
+ * room, and the joiner's game: drawing what the host sends, answering its
+ * questions, "Are you still there?" when his time to answer is up, and
+ * reconnecting by himself when his connection drops. */
 #ifndef NETUI_H
 #define NETUI_H
 

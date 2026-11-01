@@ -99,6 +99,7 @@ DOC_IMAGES = \
 	docs/images/host-not-found.png \
 	docs/images/game-board.png \
 	docs/images/joiner-view.png \
+	docs/images/name-prompt.png \
 	docs/images/new-game.png \
 	docs/images/start-up.png \
 	docs/images/the-deal.png \

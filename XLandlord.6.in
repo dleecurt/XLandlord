@@ -715,6 +715,10 @@ which
 looks for. Without them the shipped PDF is used as it is.
 .\" ------------------------------------------------------------------
 .SH PLAYING AT THE SCREEN
+The game first asks your name (see
+.BR OPTIONS ),
+then how to play. In a game at this screen, seat 1 is you; the New Game
+form asks the names of any other human seats.
 On your turn the
 .B Roll Dice
 button has the black focus box; press it, Space or Enter. Whenever the

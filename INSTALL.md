@@ -65,8 +65,8 @@ A release tarball (`xlandlord-X.Y.Z.tar.gz`) already contains the
 `configure` script, so you only need the build tools from section 1.
 
 ```
-tar xzf xlandlord-0.0.12.tar.gz
-cd xlandlord-0.0.12
+tar xzf xlandlord-0.0.13.tar.gz
+cd xlandlord-0.0.13
 ./configure
 make
 make check            # optional, about 10 seconds, needs no display
@@ -82,7 +82,7 @@ XLandlord
 `configure` ends with a summary, for example:
 
 ```
-  XLandlord 0.0.12 is configured:
+  XLandlord 0.0.13 is configured:
     compiler:        gcc
     X11:             -lX11
     install prefix:  /usr/local
@@ -151,7 +151,7 @@ manager does that).
 | Target | What it does |
 | ------ | ------------ |
 | `make` | Builds `./XLandlord`. |
-| `make check` | Runs the tests (also `make test`). `tests/engine` plays several hundred games between computer players and checks the rules engine and that Hard beats Medium beats Easy; `tests/net` plays whole network games through a stand-in for ssh (the four-player limit, no computer player with four humans, a player leaving with nobody taking his seat, reconnecting after a dropped connection, a player who stops answering). No display is needed. |
+| `make check` | Runs the tests (also `make test`). `tests/engine` plays several hundred games between computer players and checks the rules engine and that Hard beats Medium beats Easy; `tests/net` plays whole network games through a stand-in for ssh (the four-player limit, no computer player with four humans, a player leaving with nobody taking his seat, reconnecting after a dropped connection, a player who stops answering, names already taken). No display is needed. |
 | `make install` | Installs everything listed in section 6. |
 | `make uninstall` | Removes it again. |
 | `make pdf` | Rebuilds `docs/xlandlord-rules.pdf` from `docs/RULES.md` (needs pandoc and LaTeX; see section 9). |
@@ -213,6 +213,9 @@ the system's `ssh` program. At run time:
   name up with the system resolver (`getaddrinfo`, which follows
   `/etc/nsswitch.conf`) and says plainly when a name is not found. The host's
   waiting room lists its name and IP addresses.
+- **The ssh user and the player's name are separate.** ssh logs in to the
+  host as the joiner's (or `user@`) login name; in the game every player is
+  known by the name he types when the program starts.
 - **Each joiner** needs the ssh client and password-less (key) access to the
   host. `README.md` ("Setting up password-less ssh") and Help > Network Play
   walk through it; the check is:
@@ -244,7 +247,7 @@ lp /usr/local/share/doc/xlandlord/xlandlord-rules.pdf
 ```
 
 Its last page is a one-page quick reference, handy to print on its own
-(`lp -P 18 ...`).
+(`lp -P 19 ...`).
 
 ### Rebuilding it
 
@@ -319,3 +322,21 @@ other ssh messages: ssh's own error is shown as it is; see section 8 and the
 ssh part of `README.md`. "no game is being hosted on this machine" means ssh
 worked but the host has not opened a game (Game > Host a Network Game) on that
 port.
+
+**Network play: "The host runs a different version of XLandlord"** - every
+machine must run the same release; the network messages change between
+releases. Install the same version everywhere (`XLandlord --version`).
+
+**Network play: "Name Taken"** - someone at the table (the host, or a player
+already in the waiting room) uses the same name, whatever the letter case.
+Type another name when asked; it is saved as your name for next time.
+
+**Network play: "Connection Lost - Trying to reconnect"** - the ssh
+connection to the host broke. The game retries every five seconds for as
+long as the host keeps the seat (its *Wait for a dropped player* time). If it
+never gets back in, check that the host is still reachable with
+`ssh -o BatchMode=yes user@host XLandlord --version`.
+
+**Network play: "Are You Still There?"** - your time to answer (set by the
+host) is up. Choose *I'm Still Here* within the minute shown, or the host
+takes you out of the game so that play can go on.

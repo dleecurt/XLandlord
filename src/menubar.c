@@ -92,6 +92,7 @@ static int split_label(const char *label, char *shown, size_t size)
     return pos;
 }
 
+/* Can this menu item be chosen now? */
 static int item_enabled(const MenuItem *it) { return !it->enabled || it->enabled(); }
 
 /* ---- geometry ---- */
