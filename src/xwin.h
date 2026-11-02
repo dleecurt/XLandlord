@@ -107,6 +107,9 @@ void xw_image_draw(int id, int sx, int sy, int w, int h, int x, int y);
 
 int  xw_text(int font, int x, int y, const char *s, int n, int color);
 int  xw_text_width(int font, const char *s, int n);
+/* Text `scale` times its size (blocky, like the pixel art), baseline at y;
+ * returns its width. For the title on the splash screen. */
+int  xw_text_scaled(int font, int x, int y, const char *s, int n, int scale, int color);
 int  xw_ascent(int font);
 int  xw_descent(int font);
 static inline int xw_line_height(int font) { return xw_ascent(font) + xw_descent(font); }

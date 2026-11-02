@@ -21,9 +21,10 @@
 /* main.c - XLandlord: start-up, the main loop and the commands.
  *
  * START-UP
- *   The player's name in the game (asked every time; never the login
- *   name), then the first question: host a network game, join one, or play
- *   at this screen (--host, --join HOST, --local skip it).
+ *   The title card (splash.c) with the first question: host a network
+ *   game, join one, or play at this screen (--host, --join HOST, --local
+ *   make the choice; the card then shows briefly). Then the player's name
+ *   in the game (asked every time; never the login name).
  *
  * THE MAIN LOOP
  *   While a game is on: if it is a computer player's turn, play it (the
@@ -46,6 +47,7 @@
 #include "ai.h"
 #include "app.h"
 #include "guide.h"
+#include "splash.h"
 #include "help.h"
 #include "human.h"
 #include "keys.h"
@@ -795,7 +797,7 @@ static void cmd_net_join(void)
  * --local on the command line chose. */
 typedef enum { START_ASK, START_HOST, START_JOIN, START_LOCAL } StartMode;
 
-/* The first thing at start-up (see start_up): the player's name in the game, asked at every
+/* At start-up, after the first question (see start_up): the player's name in the game, asked at every
  * start (the one used last time is filled in; Enter keeps it). It is the
  * player's identity at this screen and in network games, and has nothing
  * to do with the system's user name (which only ssh uses). An empty name
@@ -820,28 +822,32 @@ static int ask_own_name(void)
     }
 }
 
-/* Start-up: the player's name, then the first question - host a network
- * game, join one, or play at this screen. `mode` comes from the command
- * line (--host, --join, --local) and skips the question; `join_host` is
- * --join's host. */
+/* Start-up: the title card with the first question - host a network game,
+ * join one, or play at this screen - then the player's name in the game.
+ * `mode` comes from the command line (--host, --join, --local): the card
+ * is shown briefly and the question skipped; `join_host` is --join's
+ * host. Cancel at the name goes back to the card (or quits, when the
+ * command line chose). */
 static void start_up(StartMode mode, const char *join_host)
 {
-    /* Who is playing: asked before anything else, every time. */
-    if (!ask_own_name()) { quit_requested = 1; return; }
-    if (mode == START_ASK) {
-        static const char *const b[] = { "&Host a Network Game", "&Join a Network Game", "&Play Here", "&Quit" };
-        int i = ui_ask("XLandlord",
-                       "Welcome to The Landlord's Game.\n\n"
-                       "Host a Network Game: you run the game here and up to three players join from their own "
-                       "machines over ssh.\n"
-                       "Join a Network Game: play in a game someone else is hosting (by its IP address or host "
-                       "name).\n"
-                       "Play Here: play at this screen, against the computer or with others taking turns.",
-                       b, 4, 2, 2);
-        mode = i == 0 ? START_HOST : i == 1 ? START_JOIN : i == 2 ? START_LOCAL : START_ASK;
-        if (i == 3) { quit_requested = 1; return; }
+    StartMode chosen;
+    for (;;) {
+        if (mode == START_ASK) {
+            SplashChoice c = splash_ask();
+            if (c == SPLASH_QUIT) { quit_requested = 1; return; }
+            chosen = c == SPLASH_HOST ? START_HOST : c == SPLASH_JOIN ? START_JOIN : START_LOCAL;
+        } else {
+            chosen = mode;
+            splash_show(mode == START_HOST ? "Hosting a network game..." :
+                        mode == START_JOIN ? "Joining a network game..." : "Starting a game at this screen...",
+                        2000);
+        }
+        view_draw();                    /* the board behind the dialogs from here on */
+        xw_flush();
+        if (ask_own_name()) break;
+        if (mode != START_ASK) { quit_requested = 1; return; }
     }
-    switch (mode) {
+    switch (chosen) {
     case START_HOST:  start_network_game(); break;
     case START_JOIN:  netui_join(join_host); break;
     default:

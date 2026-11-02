@@ -55,6 +55,7 @@ XLandlord_SOURCES = \
 	src/menubar.c \
 	src/netui.c \
 	src/prefs.c \
+	src/splash.c \
 	src/ui.c \
 	src/view.c \
 	src/xwin.c
@@ -65,6 +66,7 @@ noinst_HEADERS = \
 	src/app.h \
 	src/guide.h \
 	src/guidepics.h \
+	src/splash.h \
 	src/art.h \
 	src/board.h \
 	src/game.h \

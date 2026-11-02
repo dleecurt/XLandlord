@@ -62,15 +62,17 @@ and
 .I xlandlord\-rules.pdf
 add screenshots, a numbered board map and the history of the game.
 .SH OPTIONS
-At start-up the game first asks the player's name in the game: the name
-shown to the other players and used in network games. It is never taken
-from the login name; the name used last time is filled in. Then it asks
-whether to
+The game opens on a title card that asks whether to
 .BR "Host a Network Game" ,
 .BR "Join a Network Game" ,
+.B "Play Here"
 or
-.BR "Play Here" .
-These options skip the question:
+.BR Quit .
+Then it asks the player's name in the game: the name shown to the other
+players and used in network games. It is never taken from the login name;
+the name used last time is filled in, and Cancel goes back to the title
+card. These options make the first choice instead (the title card is then
+shown for two seconds, and any key skips it):
 .TP
 .B \-\-host
 Host a network game (see
@@ -715,9 +717,8 @@ which
 looks for. Without them the shipped PDF is used as it is.
 .\" ------------------------------------------------------------------
 .SH PLAYING AT THE SCREEN
-The game first asks your name (see
-.BR OPTIONS ),
-then how to play. In a game at this screen, seat 1 is you; the New Game
+The title card asks how to play, then the game asks your name (see
+.BR OPTIONS ). In a game at this screen, seat 1 is you; the New Game
 form asks the names of any other human seats.
 On your turn the
 .B Roll Dice

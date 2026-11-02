@@ -65,8 +65,8 @@ A release tarball (`xlandlord-X.Y.Z.tar.gz`) already contains the
 `configure` script, so you only need the build tools from section 1.
 
 ```
-tar xzf xlandlord-0.0.13.tar.gz
-cd xlandlord-0.0.13
+tar xzf xlandlord-0.0.14.tar.gz
+cd xlandlord-0.0.14
 ./configure
 make
 make check            # optional, about 10 seconds, needs no display
@@ -82,7 +82,7 @@ XLandlord
 `configure` ends with a summary, for example:
 
 ```
-  XLandlord 0.0.13 is configured:
+  XLandlord 0.0.14 is configured:
     compiler:        gcc
     X11:             -lX11
     install prefix:  /usr/local

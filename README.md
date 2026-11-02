@@ -69,15 +69,16 @@ arrow keys) turn the pages.
 
 Without the 75dpi fonts the game still runs; X picks the nearest fonts it has.
 
-Current version: **0.0.13** (see `CHANGELOG.md`).
+Current version: **0.0.14** (see `CHANGELOG.md`).
 
 ## Playing
 
-The game first asks **your name**: the name you play under, shown to the
-other players and used in network games. It is never taken from your login
-name; the one used last time is filled in, so Enter keeps it (Cancel quits).
-Then it asks how you want to play: host a network game, join one, or play
-here.
+The game opens on a **title card** that asks how you want to play: **Host a
+Network Game**, **Join a Network Game**, **Play Here** or **Quit**. Then it
+asks **your name**: the name you play under, shown to the other players and
+used in network games. It is never taken from your login name; the one used
+last time is filled in, so Enter keeps it (Cancel goes back to the title
+card).
 
 A game here starts with the **New Game** form: four seats, each **Empty,
 Human or Computer** (two to four players, at least one human, and **one
@@ -108,10 +109,11 @@ One player **hosts** and up to three others **join** from their own machines.
 The connection goes through **ssh**; the game itself never opens a port to the
 network.
 
-**Starting up.** After your name, the program asks how you want to play:
-**Host a Network Game**, **Join a Network Game**, or **Play Here** (at this
-screen, against the computer or hot-seat). The same choices are in the Game
-menu at any time. To skip the question, start it with an option:
+**Starting up.** The title card asks how you want to play - **Host a
+Network Game**, **Join a Network Game**, or **Play Here** (at this screen,
+against the computer or hot-seat) - and then your name. The same choices
+are in the Game menu at any time. To skip the question, start it with an
+option (the title card then shows for two seconds, any key skipping it):
 
 ```
 XLandlord --host                 # host a network game
@@ -400,7 +402,8 @@ Only public-domain material or art made for this program is used:
 | `src/guide.c` | Help > How to Play, the illustrated guide |
 | `src/guidepics.c` | its screenshots, compiled in (made by `make guide-pics`) |
 | `src/prefs.c` | the preferences file |
-| `src/main.c` | start-up (the player's name, how to play), the main loop, the commands |
+| `src/splash.c` | the title card at start-up, with the first question |
+| `src/main.c` | start-up (how to play, then the player's name), the main loop, the commands |
 | `XLandlord.6.in` | the manual page |
 | `docs/RULES.md` | the rule book and how-to-play guide (source of the PDF) |
 | `docs/boardmap.c` | writes the numbered board map for the rules from `src/board.c` |

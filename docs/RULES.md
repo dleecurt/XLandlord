@@ -3,7 +3,7 @@
 *Lizzie J. Magie's game of 1904, by the rules of 1906, with the Single Tax,
 for one to four players at one screen or over the network.*
 
-XLandlord 0.0.13. Copyright (C) 2026 Lee Curtis. This document is
+XLandlord 0.0.14. Copyright (C) 2026 Lee Curtis. This document is
 part of the program and is free under the GNU General Public License,
 version 3 or later; the rules it describes are those of the public-domain 1904
 patent and 1906 rule book.
@@ -90,17 +90,9 @@ than the money you paid, before it collects a single rent.
 
 ## 3. Starting a game
 
-When the program starts it first asks **your name**: the name you play
-under, shown to the other players and used in network games. It is never
-taken from your login name on the computer. The name you used last time is
-filled in, so Enter keeps it; an empty name is not accepted, and Cancel
-quits.
+The program opens on its title card, which asks how you want to play:
 
-![Your name in the game.](images/name-prompt.png)
-
-Then it asks how you want to play:
-
-![The first question: host, join, or play here.](images/start-up.png)
+![The title card: host, join, or play here.](images/start-up.png)
 
 - **Host a Network Game**: you run the game and up to three players join
   from their own machines (section 18).
@@ -108,10 +100,23 @@ Then it asks how you want to play:
   (section 18).
 - **Play Here**: you play at this screen, against the computer or with others
   taking turns. This opens the **New Game** form described below.
+- **Quit**.
+
+Click one, press its underlined letter, or move the focus box with the arrow
+keys and press Enter; the line under the buttons says what the chosen one
+does.
+
+Then it asks **your name**: the name you play under, shown to the other
+players and used in network games. It is never taken from your login name on
+the computer. The name you used last time is filled in, so Enter keeps it; an
+empty name is not accepted, and Cancel goes back to the title card.
+
+![Your name in the game.](images/name-prompt.png)
 
 The same choices are in the Game menu at any time (Game > New Game is *Play
 Here*; Ctrl+N). From a terminal, `XLandlord --host`, `--join HOST` or
-`--local` skips the question.
+`--local` makes the choice: the title card shows for two seconds (any key
+skips it), then the game asks your name.
 
 The **New Game** form:
 

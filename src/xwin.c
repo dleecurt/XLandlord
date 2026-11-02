@@ -162,6 +162,43 @@ int xw_text(int font, int x, int y, const char *s, int n, int color)
     return XTextWidth(fonts[font], s, n);
 }
 
+/* See xwin.h: the text drawn once at its own size into a one-bit pixmap,
+ * read back, and each set pixel drawn as a scale x scale square - a large
+ * title from the X server's ordinary fonts, with the blocky look of the
+ * game's pixel art. */
+int xw_text_scaled(int font, int x, int y, const char *s, int n, int scale, int color)
+{
+    if (n <= 0 || scale < 1) return 0;
+    XFontStruct *f = fonts[font];
+    int w = XTextWidth(f, s, n), h = f->ascent + f->descent;
+    if (w <= 0 || h <= 0) return 0;
+    Pixmap pm = XCreatePixmap(dpy, win, (unsigned)w, (unsigned)h, 1);
+    GC g1 = XCreateGC(dpy, pm, 0, NULL);
+    XSetForeground(dpy, g1, 0);
+    XFillRectangle(dpy, pm, g1, 0, 0, (unsigned)w, (unsigned)h);
+    XSetForeground(dpy, g1, 1);
+    XSetFont(dpy, g1, f->fid);
+    XDrawString(dpy, pm, g1, 0, f->ascent, s, n);
+    XImage *im = XGetImage(dpy, pm, 0, 0, (unsigned)w, (unsigned)h, 1, XYPixmap);
+    XSetForeground(dpy, gc, pixels[color]);
+    if (im) {
+        for (int j = 0; j < h; j++) {
+            for (int i = 0; i < w; ) {
+                if (!XGetPixel(im, i, j)) { i++; continue; }
+                int k = i;
+                while (k < w && XGetPixel(im, k, j)) k++;        /* a run of set pixels */
+                XFillRectangle(dpy, back, gc, x + i * scale, y - f->ascent * scale + j * scale,
+                               (unsigned)((k - i) * scale), (unsigned)scale);
+                i = k;
+            }
+        }
+        XDestroyImage(im);
+    }
+    XFreeGC(dpy, g1);
+    XFreePixmap(dpy, pm);
+    return w * scale;
+}
+
 /* See xwin.h. */
 int xw_text_width(int font, const char *s, int n)
 {

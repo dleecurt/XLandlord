@@ -60,16 +60,16 @@ static const Page pages[] = {
       "single rent.\n\n"
       "Use Next (or the Right arrow) to turn the page." },
     { "Starting", "start-up",
-      "When XLandlord starts it first asks your name - the name you play "
-      "under, shown to everyone and used in network games (not your login "
-      "name). Then it asks how you want to play.\n\n"
+      "XLandlord opens on its title card, which asks how you want to play.\n\n"
       "Host a Network Game: you run the game and up to three players join "
       "from their own machines.\n\n"
       "Join a Network Game: you play in a game someone else is hosting.\n\n"
       "Play Here: everyone plays at this screen, against the computer or "
       "taking turns.\n\n"
+      "Then it asks your name - the name you play under, shown to everyone "
+      "and used in network games (not your login name).\n\n"
       "The same choices are in the Game menu at any time. From a terminal, "
-      "XLandlord --host, --join HOST or --local skips the question." },
+      "XLandlord --host, --join HOST or --local makes the first choice." },
     { "The New Game form", "new-game",
       "Each of the four seats is Empty, a Human at this screen, or the "
       "Computer. You need two players at least, and one human; one seat at "

@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.0.14 - 2026-11-02
+
+- A title card at start-up: it fills the window, on the board's cream with
+  its double rule - pictures from the board, "XLandlord" in large type,
+  "The Landlord's Game", Lizzie Magie's patent of 1904 and the rules of
+  1906, the motto "Labor upon Mother Earth produces Wages", the version and
+  copyright.
+- The first question is on the title card: Host a Network Game, Join a
+  Network Game, Play Here or Quit (click, the underlined letter, or the
+  arrows and Enter; a line says what the chosen one does).
+- The order is now: how to play first, then the player's name. Cancel at
+  the name prompt goes back to the title card.
+- With --host, --join or --local the title card shows for two seconds (any
+  key skips it), then the name prompt.
+- xw_text_scaled draws large titles from the ordinary X fonts.
+- The rule book's start-up picture, the guide's Starting page and every
+  description of start-up follow the new order.
+- The rules PDF prints the name-prompt picture at a sensible size (it was
+  stretched to the page width).
+
 ## 0.0.13 - 2026-11-01
 
 Documentation, rules and comments brought up to date with 0.0.10 - 0.0.12:
