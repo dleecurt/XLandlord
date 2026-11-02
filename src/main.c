@@ -278,7 +278,7 @@ static void start_network_game(void)
     Game *g = &app.game;
     set_hooks(g);
     for (int p = 0; p < g->nplayers; p++)
-        game_set_decider(g, p, p == 0 ? &human_decider : g->pl[p].cpu ? &ai_decider : &net_decider);
+        game_set_decider(g, p, p == net_host_seat() ? &human_decider : g->pl[p].cpu ? &ai_decider : &net_decider);
     net_set_action_handler(host_action);
     net_start_game(g);
     begin(g);

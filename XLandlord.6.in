@@ -274,9 +274,16 @@ the game uses whatever ssh does.
 .SH NETWORK PLAY
 One player chooses
 .B Host a Network Game
-(at start-up or in the Game menu), picks the computer player's skill for
-the game (joiners have no say in it), the length of the game, the rules and a port (1904 unless that is taken),
-and waits in the waiting room. The waiting room shows how to reach the
+(at start-up or in the Game menu) and chooses
+.B Host and Play
+(he takes a seat; up to three others join) or
+.B Host Only
+(he runs the game without a seat and watches it; all four seats are for
+joiners; he has no turn but can still remove a silent player or end the
+game). He then picks the computer player's skill for the game (joiners
+have no say in it), the length of the game, the rules, the two timers and
+a port (1904 unless that is taken), and waits in the waiting room until at
+least one player has joined. The waiting room shows how to reach the
 host: its host name and its IP addresses.
 .PP
 Up to three others choose
@@ -315,7 +322,8 @@ by his login name (which only ssh uses, to log in to the host). No two
 players may have the same name: a joiner whose name is taken (by the host
 or someone in the waiting room) is turned away and asked for another.
 .PP
-Four players at most: a fifth is turned away with a warning. When fewer
+Four players at most (the host and three joiners, or four joiners when he
+only hosts): a fifth is turned away with a warning. When fewer
 than four humans play, one computer player takes a free seat; with four
 humans there is none, and while the waiting room is open a fourth human
 who joins takes the computer player's seat.
@@ -448,6 +456,12 @@ his turn before he is asked whether he is still there:
 .B 2
 (the default) or
 .BR 5 .
+.TP
+.B net_host_only
+.B 1
+to host without playing (Host Only),
+.B 0
+to host and play (the default).
 .TP
 .B net_command
 The program ssh runs on the host (default

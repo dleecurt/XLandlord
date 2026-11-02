@@ -203,9 +203,11 @@ static const Page pages[] = {
       "millionaire\".\n\n"
       "Ctrl+N starts a new game." },
     { "Playing over the network", "waiting-room",
-      "One player hosts (Host a Network Game) and waits here; up to three "
-      "others join from their own machines by typing the host's IP address "
-      "or host name. The host presses Start Game when everyone is in.\n\n"
+      "One player hosts (Host a Network Game) and waits here; the others "
+      "join from their own machines by typing the host's IP address or host "
+      "name. The host presses Start Game when everyone is in.\n\n"
+      "Host and Play: the host takes a seat and up to three others join. Host "
+      "Only: the host watches without playing, and up to four join.\n\n"
       "The connection runs over ssh, so each joiner must be able to log in "
       "to the host with ssh without a password. Help > Network Play and the "
       "manual page (man 6 XLandlord) explain how to set that up.\n\n"

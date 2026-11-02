@@ -53,7 +53,7 @@ static const char *const kind_names[NM_COUNT] = {
 /* Numbers before the text; -1: the whole line is numbers. */
 static const int kind_fields[NM_COUNT] = {
     [NM_HELLO] = 1, [NM_WELCOME] = 1, [NM_REFUSE] = 0, [NM_LOBBY] = 0,
-    [NM_START] = 4, [NM_PLAYER] = 3, [NM_STATE] = -1, [NM_LOG] = 0,
+    [NM_START] = 5, [NM_PLAYER] = 3, [NM_STATE] = -1, [NM_LOG] = 0,
     [NM_TURN] = 1, [NM_ASK] = 5, [NM_ANSWER] = 2, [NM_ACTION] = 4,
     [NM_NOTE] = 0, [NM_BYE] = 0, [NM_FROM] = 0,
     [NM_ALIVE] = 0, [NM_WAIT] = 3,
@@ -319,7 +319,9 @@ typedef struct {
 
 static int listen_fd = -1;              /* the localhost listener */
 static Conn conns[MAX_CONNS];           /* everyone connected: in the lobby, seated, or just arrived */
-static int lobby[NET_MAX_REMOTE], nlobby;       /* conn indices, in order of arrival */
+static int lobby[MAXPLAYERS], nlobby;           /* conn indices, in order of arrival */
+static int host_plays = 1;              /* the host takes seat 0 (else he only hosts and watches) */
+static int client_host_seat;            /* a joiner: the host's seat as START gave it, or -1 */
 static int lobby_open;                          /* before the game starts */
 static int seat_conn[MAXPLAYERS];               /* conn of a remote seat, or -1 */
 static int seat_remote[MAXPLAYERS];     /* the seat belongs to a joiner (even after he left) */
@@ -474,12 +476,27 @@ static void close_conn(int c)
     conns[c].open = 0;
 }
 
+/* See net.h. */
+void net_set_host_plays(int plays) { host_plays = plays != 0; }
+int net_host_plays(void) { return host_plays; }
+
+/* See net.h. */
+int net_host_seat(void)
+{
+    if (role == NET_HOST) return host_plays ? 0 : -1;
+    if (role == NET_CLIENT) return client_host_seat;
+    return -1;
+}
+void net_set_client_host_seat(int p) { client_host_seat = p >= 0 && p < MAXPLAYERS ? p : -1; }
+
 /* Tell everyone waiting who is at the table. */
 static void send_lobby(void)
 {
     char text[1200], here[128];
     own_label(here, sizeof here);
-    int n = snprintf(text, sizeof text, "%s (host, %s)", host_name[0] ? host_name : "Host", here);
+    int n = host_plays ? snprintf(text, sizeof text, "%s (host, %s)", host_name[0] ? host_name : "Host", here)
+                       : snprintf(text, sizeof text, "hosted by %s on %s (not playing)",
+                                  host_name[0] ? host_name : "the host", here);
     for (int i = 0; i < nlobby && n < (int)sizeof text; i++)
         n += snprintf(text + n, sizeof text - (size_t)n, ", %s (from %s)", conns[lobby[i]].name, conns[lobby[i]].from);
     for (int i = 0; i < nlobby; i++) send_msg(conns[lobby[i]].in.fd, NM_LOBBY, NULL, 0, text);
@@ -543,18 +560,18 @@ static void refuse(int c, const char *why)
     close_conn(c);
 }
 
-/* Humans at the table now: the host and the joiners (or, during a game, the
- * human seats). */
+/* Humans at the table now: the host (if he plays) and the joiners (or,
+ * during a game, the human seats). */
 static int humans_seated(void)
 {
-    if (!hgame) return 1 + nlobby;
+    if (!hgame) return (host_plays ? 1 : 0) + nlobby;
     int n = 0;
     for (int q = 0; q < hgame->nplayers; q++) n += !hgame->pl[q].cpu;
     return n;
 }
 
-#define FULL_MESSAGE "The table is full: four players are already seated (the host and three others), " \
-                     "and four is the limit. Try again when the next game is set up."
+#define FULL_MESSAGE "The table is full: four players are already seated, and four is the limit. " \
+                     "Try again when the next game is set up."
 
 /* Send seat p's player everything he needs to draw the game: START (with
  * the timers), each PLAYER, the whole STATE. At the start of the game, and
@@ -562,8 +579,8 @@ static int humans_seated(void)
 static void send_game_to(int c, int p)
 {
     int fd = conns[c].in.fd;
-    int st[4] = { p, hgame->nplayers, reconnect_secs, answer_secs };
-    send_msg(fd, NM_START, st, 4, NULL);
+    int st[5] = { p, hgame->nplayers, reconnect_secs, answer_secs, host_plays ? 0 : -1 };
+    send_msg(fd, NM_START, st, 5, NULL);
     for (int q = 0; q < hgame->nplayers; q++) {
         int pl[3] = { q, hgame->pl[q].cpu, hgame->pl[q].difficulty };
         char text[700];
@@ -625,7 +642,7 @@ static void greet(int c, const char *line)
     }
     /* Names are what players are known by at the table (not their login
      * names), so no two may be the same. */
-    int taken = !strcasecmp(conns[c].name, host_name[0] ? host_name : "Host");
+    int taken = host_plays && !strcasecmp(conns[c].name, host_name[0] ? host_name : "Host");
     for (int i = 0; i < nlobby; i++) if (!strcasecmp(conns[lobby[i]].name, conns[c].name)) taken = 1;
     if (taken) {
         char why[200];
@@ -735,16 +752,18 @@ int net_host_poll(int ms)
 
 static const char *const cpu_name = "Lord Blueblood";
 
-/* See net.h: host, joiners in order of arrival, then one computer player
- * only if a seat is free. */
+/* See net.h: the host (if he plays), joiners in order of arrival, then one
+ * computer player only if a seat is free. */
 void net_build_table(GameSettings *s, const char *hname, int cpu_difficulty)
 {
     copy_str(host_name, sizeof host_name, hname);
     for (int p = 0; p < MAXPLAYERS; p++) player_from[p][0] = '\0';
     s->nplayers = 0;
-    copy_str(s->names[s->nplayers], NAME_LEN, hname);
-    own_label(player_from[0], sizeof player_from[0]);
-    s->cpu[s->nplayers++] = 0;
+    if (host_plays) {
+        copy_str(s->names[s->nplayers], NAME_LEN, hname);
+        own_label(player_from[0], sizeof player_from[0]);
+        s->cpu[s->nplayers++] = 0;
+    }
     for (int p = 0; p < MAXPLAYERS; p++) { seat_remote[p] = 0; seat_conn[p] = -1; seat_away_until[p] = 0; seat_name[p][0] = '\0'; }
     for (int i = 0; i < nlobby && s->nplayers < MAXPLAYERS; i++) {
         int p = s->nplayers++, c = lobby[i];

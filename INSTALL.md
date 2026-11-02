@@ -65,8 +65,8 @@ A release tarball (`xlandlord-X.Y.Z.tar.gz`) already contains the
 `configure` script, so you only need the build tools from section 1.
 
 ```
-tar xzf xlandlord-0.0.14.tar.gz
-cd xlandlord-0.0.14
+tar xzf xlandlord-0.0.15.tar.gz
+cd xlandlord-0.0.15
 ./configure
 make
 make check            # optional, about 10 seconds, needs no display
@@ -82,7 +82,7 @@ XLandlord
 `configure` ends with a summary, for example:
 
 ```
-  XLandlord 0.0.14 is configured:
+  XLandlord 0.0.15 is configured:
     compiler:        gcc
     X11:             -lX11
     install prefix:  /usr/local
@@ -151,7 +151,7 @@ manager does that).
 | Target | What it does |
 | ------ | ------------ |
 | `make` | Builds `./XLandlord`. |
-| `make check` | Runs the tests (also `make test`). `tests/engine` plays several hundred games between computer players and checks the rules engine and that Hard beats Medium beats Easy; `tests/net` plays whole network games through a stand-in for ssh (the four-player limit, no computer player with four humans, a player leaving with nobody taking his seat, reconnecting after a dropped connection, a player who stops answering, names already taken). No display is needed. |
+| `make check` | Runs the tests (also `make test`). `tests/engine` plays several hundred games between computer players and checks the rules engine and that Hard beats Medium beats Easy; `tests/net` plays whole network games through a stand-in for ssh (the four-player limit, no computer player with four humans, a player leaving with nobody taking his seat, reconnecting after a dropped connection, a player who stops answering, names already taken, host-only games). No display is needed. |
 | `make install` | Installs everything listed in section 6. |
 | `make uninstall` | Removes it again. |
 | `make pdf` | Rebuilds `docs/xlandlord-rules.pdf` from `docs/RULES.md` (needs pandoc and LaTeX; see section 9). |
@@ -247,7 +247,7 @@ lp /usr/local/share/doc/xlandlord/xlandlord-rules.pdf
 ```
 
 Its last page is a one-page quick reference, handy to print on its own
-(`lp -P 19 ...`).
+(`lp -P 20 ...`).
 
 ### Rebuilding it
 

@@ -52,6 +52,7 @@ typedef struct {
     char net_command[128];  /* the program ssh runs on the host for the relay */
     int net_reconnect;      /* minutes a hosted game waits for a dropped player: 1, 2 or 5 */
     int net_answer;         /* minutes a joiner has to answer (then a warning): 1, 2 or 5 */
+    int net_host_only;      /* host without playing (watch; four seats for joiners) */
     /* The strength of the one computer player (DIFF_EASY..DIFF_HARD), for
      * games at this screen and hosted games alike: the player who sets up
      * the game chooses it for everyone. */

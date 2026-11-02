@@ -154,11 +154,14 @@ static int lobby(void)
         int w = MIN(620, xw_width() - 40);
         char note[1400], buf[1600];
         const char *lines[16];
+        int plays = net_host_plays();
         snprintf(note, sizeof note,
-                 "Players join from their own machines with Join a Network Game, entering %s%s "
+                 "%sPlayers join from their own machines with Join a Network Game, entering %s%s "
                  "(a name works if their machine finds it in DNS or its hosts file). The game is reached through "
                  "ssh; see Help > Network Play. Four players at most: a fifth is turned away. If fewer than four "
                  "humans play, one computer player takes a free seat.",
+                 plays ? "" : "You host without playing, and watch the game here: all four seats are for "
+                              "players who join. ",
                  addr, app.prefs.net_port == NET_PORT ? "" : " with the port after a colon");
         int nn = ui_wrap(XF_UI, note, w - 2 * UI_MARGIN, buf, sizeof buf, lines, 16);
         int rows = MAXPLAYERS + 2;
@@ -171,13 +174,18 @@ static int lobby(void)
         UiRect list = { c.x, y, c.w, MAXPLAYERS * (lh + 6) + 6 };
         xw_fill(list.x, list.y, list.w, list.h, XC_SURFACE);
         xw_sunken(list.x, list.y, list.w, list.h);
+        /* Seat i: the host (if he plays), the joiners in order, then the
+         * computer player's seat if one is free, then open seats. */
+        int first = plays ? 1 : 0;      /* the first seat for a joiner */
+        const char *skill = app.prefs.cpu_skill == DIFF_EASY ? "easy" : app.prefs.cpu_skill == DIFF_HARD ? "hard" : "medium";
         for (int i = 0; i < MAXPLAYERS; i++) {
             char row[400];
-            if (i == 0) snprintf(row, sizeof row, "1.  %s  (host, this screen: %s)", app.prefs.names[0], here);
-            else if (i <= joined) snprintf(row, sizeof row, "%d.  %s  (from %s)", i + 1, net_lobby_name(i - 1),
-                                           net_lobby_from(i - 1));
-            else if (i == joined + 1) snprintf(row, sizeof row, "%d.  a computer player (%s), unless someone joins", i + 1,
-                                               app.prefs.cpu_skill == DIFF_EASY ? "easy" : app.prefs.cpu_skill == DIFF_HARD ? "hard" : "medium");
+            int j = i - first;          /* which joiner sits here */
+            if (plays && i == 0) snprintf(row, sizeof row, "1.  %s  (host, this screen: %s)", app.prefs.names[0], here);
+            else if (j < joined) snprintf(row, sizeof row, "%d.  %s  (from %s)", i + 1, net_lobby_name(j),
+                                          net_lobby_from(j));
+            else if (j == joined) snprintf(row, sizeof row, "%d.  a computer player (%s), unless someone joins", i + 1,
+                                           skill);
             else snprintf(row, sizeof row, "%d.  (open)", i + 1);
             xw_text(XF_UI, list.x + 10, list.y + 4 + i * (lh + 6) + xw_ascent(XF_UI), row, (int)strlen(row), XC_INK);
         }
@@ -223,32 +231,38 @@ int netui_host_setup(GameSettings *s)
     static const char *const rules[] = { "Standard", "Advanced" };
     static const char *const mins[] = { "1 min", "2 min", "5 min" };
     static const int len_val[] = { 3, 5, 7, 10 }, min_val[] = { 1, 2, 5 };
+    static const char *const you[] = { "Host and Play", "Host Only" };
     UiRow rows[] = {
+        { "You", you, 2 },
         { "Computer skill", cpus, 3 },
         { "Game ends at wages", lens, 4 },
         { "Rules", rules, 2 },
         { "Wait for a dropped player", mins, 3 },
         { "Time to answer", mins, 3 },
     };
-    int sel[5] = { CLAMP(app.prefs.cpu_skill, DIFF_EASY, DIFF_HARD), 1, app.prefs.advanced, 1, 1 };
-    for (int i = 0; i < 4; i++) if (len_val[i] == app.prefs.end_wages) sel[1] = i;
+    int sel[6] = { app.prefs.net_host_only != 0, CLAMP(app.prefs.cpu_skill, DIFF_EASY, DIFF_HARD), 1,
+                   app.prefs.advanced, 1, 1 };
+    for (int i = 0; i < 4; i++) if (len_val[i] == app.prefs.end_wages) sel[2] = i;
     for (int i = 0; i < 3; i++) {
-        if (min_val[i] == app.prefs.net_reconnect) sel[3] = i;
-        if (min_val[i] == app.prefs.net_answer) sel[4] = i;
+        if (min_val[i] == app.prefs.net_reconnect) sel[4] = i;
+        if (min_val[i] == app.prefs.net_answer) sel[5] = i;
     }
     if (!ui_form("Host a Network Game",
-                 "You host the game and set it up for everyone; up to three others join from their machines "
-                 "over ssh. One computer player, at the skill you choose here, takes a free seat when fewer than "
-                 "four humans play. Once the game starts nobody new can join; a player may leave, and the "
+                 "You host the game and set it up for everyone. Host and Play: you take a seat and up to three "
+                 "others join from their machines over ssh. Host Only: you watch, and up to four join. One "
+                 "computer player, at the skill you choose here, takes a free seat when fewer than four humans "
+                 "play. Once the game starts nobody new can join; a player may leave, and the "
                  "computer player stays to the end. A player whose connection drops may come back within the "
                  "waiting time; one who does not answer in time is asked if he is still there, then taken out "
-                 "of the game.", rows, 5, sel, "&Open"))
+                 "of the game.", rows, 6, sel, "&Open"))
         return 0;
-    app.prefs.cpu_skill = sel[0];
-    app.prefs.end_wages = len_val[sel[1]];
-    app.prefs.advanced = sel[2];
-    app.prefs.net_reconnect = min_val[sel[3]];
-    app.prefs.net_answer = min_val[sel[4]];
+    app.prefs.net_host_only = sel[0];
+    app.prefs.cpu_skill = sel[1];
+    app.prefs.end_wages = len_val[sel[2]];
+    app.prefs.advanced = sel[3];
+    app.prefs.net_reconnect = min_val[sel[4]];
+    app.prefs.net_answer = min_val[sel[5]];
+    net_set_host_plays(!app.prefs.net_host_only);
     net_set_timers(60 * app.prefs.net_reconnect, 60 * app.prefs.net_answer);
     int port = app.prefs.net_port;
     if (!ui_number("Host a Network Game",
@@ -371,6 +385,7 @@ static void client_message(const NetMsg *m)
         client_start(m->num[0], m->num[1]);
         if (m->num[2] > 0) client_reconnect = m->num[2];
         if (m->num[3] > 0) client_answer = m->num[3];
+        net_set_client_host_seat(m->num[4]);
         break;
     case NM_PLAYER: {
         int p = m->num[0];

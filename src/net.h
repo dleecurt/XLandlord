@@ -35,7 +35,9 @@
  *
  *     joiner's game <--pipe--> ssh ====network==== sshd --> relay <--TCP 127.0.0.1--> host game
  *
- *   The table holds four players at most: the host and up to three joiners.
+ *   The table holds four players at most: the host and up to three joiners,
+ *   or - when the host only hosts (net_set_host_plays(0)) - four joiners,
+ *   the host watching from his screen without a seat.
  *   A fifth human is turned away with a warning (REFUSE). When fewer than four
  *   humans sit down, ONE computer player, at the skill the host chose, takes
  *   a free seat; with four humans there is no computer player. Joiners have
@@ -80,10 +82,11 @@
  *   host -> joiner  WELCOME <joined> <name of host>  you are in the lobby
  *   host -> joiner  REFUSE <text>                    turned away (table full...)
  *   host -> all     LOBBY <text>                     who is waiting, for display
- *   host -> all     START <you> <nplayers> <reconnect> <answer>
+ *   host -> all     START <you> <nplayers> <reconnect> <answer> <hostseat>
  *                                                    the game begins (or he is back);
  *                                                    you are player <you>; the timers
- *                                                    in seconds
+ *                                                    in seconds; the host's seat, or
+ *                                                    -1 if he only hosts
  *   host -> all     PLAYER <p> <cpu> <diff> <name>|<from>   a player's name, kind and
  *                                                   machine (host name, or IP address)
  *   host -> all     STATE <numbers...>               the whole Game (net_encode_state)
@@ -106,10 +109,10 @@
 #include "game.h"
 
 #define NET_PORT        1904    /* the year of the patent */
-#define NET_PROTOCOL    6
+#define NET_PROTOCOL    7
 #define NET_LINE_MAX    4096
 #define NET_MAX_FIELDS  320
-#define NET_MAX_REMOTE  (MAXPLAYERS - 1)    /* the host plus three joiners */
+#define NET_MAX_REMOTE  MAXPLAYERS          /* four joiners when the host only hosts */
 
 typedef enum { NET_NONE, NET_HOST, NET_CLIENT } NetRole;
 
@@ -200,6 +203,15 @@ enum { NW_NONE, NW_ANSWER, NW_RECONNECT };
 int  net_host(int port, char *err, size_t errsize);
 /* The host's own name, shown to joiners in the lobby. */
 void net_set_host_name(const char *name);
+/* Whether the host plays (seat 0, the default) or only hosts: then all four
+ * seats are for joiners, the computer player takes a free one, and the
+ * host watches. Set before net_build_table. */
+void net_set_host_plays(int plays);
+int  net_host_plays(void);
+/* The host's seat in the game: 0, or -1 when he only hosts (on a joiner's
+ * machine, as START said; -1 outside network play). */
+int  net_host_seat(void);
+void net_set_client_host_seat(int p);
 /* The timers of the hosted game, in seconds (see TIMERS above). */
 void net_set_timers(int reconnect_secs, int answer_secs);
 /* The host's allowance for the joiner's warning and its margin (normally

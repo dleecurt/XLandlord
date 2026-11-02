@@ -522,7 +522,7 @@ static int draw_player(int p, int x, int y, int w)
     char tag[200] = "";
     const char *from = !P->cpu ? net_player_from(p) : "";
     const char *role = net_role() == NET_CLIENT && p == app.me ? "you"
-                     : p == 0 && net_role() != NET_NONE && from[0] ? "host"
+                     : p == net_host_seat() && from[0] ? "host"
                      : net_role() == NET_CLIENT || net_seat_remote(p) ? "network" : "";
     /* Keep clear of the cash on the right: shorten the machine's name
      * ("annbox.example.org" -> "annbox.exam...") until the line fits. */

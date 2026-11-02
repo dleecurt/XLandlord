@@ -45,7 +45,7 @@ installed where, uninstalling, network-play requirements and troubleshooting.
 guide, with screenshots, a numbered board map and a quick-reference page; the
 same document is in **[docs/xlandlord-rules.pdf](docs/xlandlord-rules.pdf)**
 for printing. Both are installed in `$(prefix)/share/doc/xlandlord`. The
-PDF (19 pages, its last a one-page quick reference) is the one to print:
+PDF (20 pages, its last a one-page quick reference) is the one to print:
 `xdg-open /usr/local/share/doc/xlandlord/xlandlord-rules.pdf`, or
 `lp` the same file. `make pdf` rebuilds it after editing `docs/RULES.md`
 (see [INSTALL.md](INSTALL.md), section 9). Help > The Rules of 1906 and
@@ -69,7 +69,7 @@ arrow keys) turn the pages.
 
 Without the 75dpi fonts the game still runs; X picks the nearest fonts it has.
 
-Current version: **0.0.14** (see `CHANGELOG.md`).
+Current version: **0.0.15** (see `CHANGELOG.md`).
 
 ## Playing
 
@@ -122,12 +122,17 @@ XLandlord --join lee@gamebox     # ... by host name, as user lee
 XLandlord --local                # play at this screen
 ```
 
-**Hosting.** Game > Host a Network Game. The host sets the game up for
-everyone: the computer player's skill, the length of the game, the rules,
+**Hosting.** Game > Host a Network Game. First the host chooses **Host and
+Play** (he takes a seat, and up to three others join) or **Host Only** (he
+only runs the game and watches the board on his screen; all four seats are
+for joiners, and he has no turn, though he can still remove a silent player
+or end the game). Either way he sets the game up for everyone: the computer
+player's skill, the length of the game, the rules,
 how long to wait for a player whose connection drops, and how long players
 have to answer (both 1, 2 or 5 minutes), then a port (1904 by default; it is
 only reachable from the host's own machine). A waiting room lists who has
-joined; press **Start Game** when everyone is in.
+joined; press **Start Game** when everyone is in (at least one player must
+have joined; with one, he plays the computer player).
 
 **Reaching the host.** The waiting room shows how to reach this machine: its host name
 and its IP addresses (loopback and link-local addresses are left out), for
@@ -170,7 +175,8 @@ for an IPv6 address with a port, put the address in brackets:
 
 **The table.**
 
-- Four players at most: the host and three joiners. A fifth player who tries to
+- Four players at most: the host and three joiners, or four joiners when the
+  host only hosts. A fifth player who tries to
   join is turned away with a warning ("The table is full..."); so is anyone who
   tries to join a game that has already started (except a player coming back
   after a dropped connection).
@@ -302,7 +308,7 @@ with the seats as `seat1` .. `seat4` (`empty`, `human`, `computer`; one
 `net_host` (the last host joined), `net_port` (the port to host on),
 `net_command` (the program ssh runs on the host, normally `XLandlord`),
 `net_reconnect` and `net_answer` (the hosted game's timers, in minutes: 1,
-2 or 5).
+2 or 5), and `net_host_only` (1: host without playing).
 Older files are converted (a level per computer seat and `net_cpu` become
 one computer seat and `cpu_skill`); a 0.0.1 file is converted too,
 and a file from before the game was renamed XLandlord
@@ -410,7 +416,7 @@ Only public-domain material or art made for this program is used:
 | `docs/guide/*.png` | the guide's screenshots, the source of `src/guidepics.c` |
 | `docs/guidepics.c` | turns them into `src/guidepics.c` |
 | `tests/engine.c` | `make check`: computer-only games, consistency checks, a player leaving mid-game |
-| `tests/net.c` | `make check`: network games end to end through a stand-in for ssh (table limit, no computer player with four humans, quitting, reconnecting, a player who stops answering, names taken) |
+| `tests/net.c` | `make check`: network games end to end through a stand-in for ssh (table limit, no computer player with four humans, quitting, reconnecting, a player who stops answering, names taken, host-only games) |
 
 ## License
 

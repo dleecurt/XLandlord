@@ -289,7 +289,7 @@ static int play_hosted(Game *g, int *nplayers, int *over)
     for (int p = 0; p < s.nplayers; p++) ncpu += s.cpu[p];
     game_new(g, &s);
     for (int p = 0; p < g->nplayers; p++)
-        game_set_decider(g, p, p == 0 || g->pl[p].cpu ? &ai_decider : &net_decider);
+        game_set_decider(g, p, p == net_host_seat() || g->pl[p].cpu ? &ai_decider : &net_decider);
     g->hooks.changed = broadcast;
     net_start_game(g);
     game_deal(g);
@@ -435,6 +435,35 @@ int main(int argc, char **argv)
     CHECK(net_lobby_count() == 1, "the lobby should still hold only Ivy (%d)", net_lobby_count());
     net_close("Game over.");
     { int st = wait_child(ivy); CHECK(st == 0, "Ivy exited %d", st); }
+
+    /* 10. host only: the host watches; four seats for joiners; the computer
+     * player in a free seat; the host's name is free for a joiner. */
+    net_set_host_plays(0);
+    port++;
+    CHECK(net_host(port, err, sizeof err) == 0, "host (host only, one joiner): %s", err);
+    net_set_host_name("Host");
+    pid_t solo = spawn_robot("Host", 0);       /* the host's own name: allowed, he has no seat */
+    CHECK(wait_lobby(1), "a joiner called like a watching host was turned away");
+    int ncpu1 = play_hosted(&g, &np, &over);
+    CHECK(np == 2 && ncpu1 == 1, "host only, one joiner: %d players, %d computer (want 2, 1)", np, ncpu1);
+    CHECK(net_host_seat() == -1 && !g.pl[0].cpu && net_seat_remote(0), "host only: seat 0 is not the joiner's");
+    CHECK(over, "the host-only game with one joiner did not end");
+    net_close("Game over.");
+    { int st = wait_child(solo); CHECK(st == 0, "the lone joiner exited %d", st); }
+
+    port++;
+    CHECK(net_host(port, err, sizeof err) == 0, "host (host only, four joiners): %s", err);
+    pid_t four[4];
+    const char *fnames[4] = { "Joe", "Kim", "Lou", "Max" };
+    for (int i = 0; i < 4; i++) { four[i] = spawn_robot(fnames[i], 0); CHECK(wait_lobby(i + 1), "%s in the lobby", fnames[i]); }
+    pid_t fifth = spawn_robot("Ned", 0);
+    CHECK(wait_child(fifth) == 3, "a fifth joiner of a host-only game was not turned away");
+    int ncpu4 = play_hosted(&g, &np, &over);
+    CHECK(np == 4 && ncpu4 == 0, "host only, four joiners: %d players, %d computer (want 4, 0)", np, ncpu4);
+    CHECK(over, "the host-only game with four joiners did not end");
+    net_close("Game over.");
+    for (int i = 0; i < 4; i++) { int st = wait_child(four[i]); CHECK(st == 0, "%s exited %d", fnames[i], st); }
+    net_set_host_plays(1);
 
     if (failures) { printf("%d check(s) failed\n", failures); return 1; }
     return 0;

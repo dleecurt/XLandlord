@@ -185,6 +185,7 @@ void prefs_load(Prefs *p)
         else if (!strcmp(key, "net_command") && *val) copy_str(p->net_command, sizeof p->net_command, val);
         else if (!strcmp(key, "net_reconnect")) p->net_reconnect = n == 1 || n == 5 ? n : 2;
         else if (!strcmp(key, "net_answer")) p->net_answer = n == 1 || n == 5 ? n : 2;
+        else if (!strcmp(key, "net_host_only")) p->net_host_only = n != 0;
         else if (!strcmp(key, "net_cpu")) {     /* 0.0.3 - 0.0.9: used if no seat gave a level */
             int d = skill_from_word(val);
             if (d >= 0 && !skill_given && !seat_skill) p->cpu_skill = d;
@@ -236,6 +237,8 @@ int prefs_save(const Prefs *p)
     fprintf(f, "# hosted games: minutes to wait for a dropped player, and to answer (1, 2 or 5)\n");
     fprintf(f, "net_reconnect = %d\n", p->net_reconnect);
     fprintf(f, "net_answer = %d\n", p->net_answer);
+    fprintf(f, "# hosted games: 1 = host only (watch; four seats for joiners), 0 = host and play\n");
+    fprintf(f, "net_host_only = %d\n", p->net_host_only);
     return fclose(f) == 0;
 }
 

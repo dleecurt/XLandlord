@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.0.15 - 2026-11-02
+
+- Hosting has a new first choice: **Host and Play** (as before: the host
+  takes seat 1 and up to three others join) or **Host Only**: the host runs
+  the game without a seat and watches it on his screen - board, player boxes
+  and record of events - with no turn of his own (he can still remove a
+  silent player or end the game). All four seats are then for joiners; the
+  computer player still takes a free seat, at the host's skill, and gives
+  it up to a fourth joiner before the start. Start Game needs one joiner at
+  least (one alone plays the computer player).
+- A watching host's name does not block a joiner from using it.
+- The waiting rooms say "hosted by Lee on gamebox (not playing)".
+- New preference `net_host_only`.
+- Network protocol 7 (START carries the host's seat, -1 when he only
+  hosts): 0.0.15 cannot play with 0.0.14.
+- tests/net plays host-only games with one joiner (against the computer
+  player) and with four (no computer player; a fifth turned away).
+
 ## 0.0.14 - 2026-11-02
 
 - A title card at start-up: it fills the window, on the board's cream with

@@ -3,7 +3,7 @@
 *Lizzie J. Magie's game of 1904, by the rules of 1906, with the Single Tax,
 for one to four players at one screen or over the network.*
 
-XLandlord 0.0.14. Copyright (C) 2026 Lee Curtis. This document is
+XLandlord 0.0.15. Copyright (C) 2026 Lee Curtis. This document is
 part of the program and is free under the GNU General Public License,
 version 3 or later; the rules it describes are those of the public-domain 1904
 patent and 1906 rule book.
@@ -506,9 +506,21 @@ at the keyboard and mouse:
 Up to four players can play from their own machines. One **hosts** the game;
 the others **join** it through **ssh**.
 
-**To host:** Game > Host a Network Game. Choose the computer player's strength,
-the length of the game, the rules, and a port (1904 unless that is taken). The
-waiting room shows who has joined; press **Start Game** when everyone is in.
+**To host:** Game > Host a Network Game. First choose **Host and Play** or
+**Host Only**:
+
+- **Host and Play**: you take a seat like everyone else; up to three others
+  join.
+- **Host Only**: you run the game without playing in it. All four seats are
+  for players who join; your screen shows the board and the record of events
+  as they play, but you have no turn. You can still take out a player who has
+  stopped answering, or end the game.
+
+Then choose the computer player's skill, the length of the game, the rules,
+how long to wait for a dropped player and how long players have to answer,
+and a port (1904 unless that is taken). The waiting room shows who has
+joined; press **Start Game** when everyone is in. At least one player must
+have joined: one alone plays the computer player.
 
 ![The host's waiting room.](images/waiting-room.png)
 
@@ -550,7 +562,8 @@ for an IPv6 address with a port, put the address in brackets:
 
 ![A joiner's screen: "Ann (you)" playing on her own machine.](images/joiner-view.png)
 
-**The table.** Four players at most: the host and three joiners. A fifth
+**The table.** Four players at most: the host and three joiners, or four
+joiners when the host only hosts. A fifth
 player is turned away with a warning, and so is anyone joining a game already
 under way. When fewer than four humans sit down, **one** computer player takes
 a free seat, at the skill the host chose; four humans play without one (a
@@ -663,6 +676,8 @@ over the network needed some decisions of its own:
   host chose, and the player may come back.
 - **Taking too long**: after the host's answer time a player is asked whether
   he is still there, and one minute later he is taken out of the game.
+- **Host Only**: a host may run a game without a seat; the computer player
+  still takes a free seat, and his own name stays free for a joiner.
 - **The host** runs the only copy of the game, so when he leaves the game is
   over for everyone.
 
@@ -708,7 +723,7 @@ chosen). **Worth:** cash + 100 for each card, house, luxury and Professor card.
 | Raising money | to the pack at half price; houses $50; to a computer player at his offer |
 | Poor House | when you cannot pay at all; until your next turn |
 | Single Tax | 2 votes; land rent to the Treasury; each $50 frees a utility, then builds a college, then raises wages $10 |
-| Network | host + up to 3; one computer player at most; names unique; a quitter's cards go back to the pack |
+| Network | host + up to 3 (4 if he only hosts); one computer player at most; names unique; a quitter's cards go back to the pack |
 
 | Key | | Key | |
 | --- | --- | --- | --- |
