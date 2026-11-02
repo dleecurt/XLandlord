@@ -3,7 +3,7 @@
 *Lizzie J. Magie's game of 1904, by the rules of 1906, with the Single Tax,
 for one to four players at one screen or over the network.*
 
-XLandlord 0.0.15. Copyright (C) 2026 Lee Curtis. This document is
+XLandlord 0.0.16. Copyright (C) 2026 Lee Curtis. This document is
 part of the program and is free under the GNU General Public License,
 version 3 or later; the rules it describes are those of the public-domain 1904
 patent and 1906 rule book.
@@ -593,6 +593,13 @@ player who is away or silent, he may also remove him at once.
 **The host.** Nobody else can take over a game, so if the host leaves, the
 game is over for everyone; each joiner is told, whether the host ended the
 game or his game simply stopped.
+
+**A game server.** `XLandlord --server` runs a game host with no window, game
+after game, on a machine nobody plays at. Players join it as they join any
+host. A game starts when four have joined, or a minute after the latest
+arrival; the computer player takes a free seat. The server prints everything
+that happens and keeps a log of each game in `~/log/`. See the manual page
+(`man 6 XLandlord`, SERVER MODE).
 
 **What you need.** The same version of the game on every machine, an ssh
 server on the host, and **password-less ssh** from each joiner to the host. On

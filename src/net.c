@@ -249,7 +249,13 @@ static int send_msg(int fd, NetMsgKind kind, const int *num, int nnum, const cha
 static int fill(LineBuf *b)
 {
     for (;;) {
-        if (b->len >= (int)sizeof b->buf - 1) b->len = 0;   /* an absurd line: drop it */
+        if (b->len >= (int)sizeof b->buf - 1) {
+            /* Full. Complete lines waiting: leave the rest in the socket
+             * until they are taken. No newline at all: an absurd line,
+             * dropped. */
+            if (memchr(b->buf, '\n', (size_t)b->len)) return 0;
+            b->len = 0;
+        }
         ssize_t r = read(b->fd, b->buf + b->len, sizeof b->buf - 1 - (size_t)b->len);
         if (r > 0) { b->len += (int)r; continue; }
         if (r == 0) return -1;
@@ -1002,7 +1008,7 @@ void net_close(const char *why)
         }
         if (listen_fd >= 0) close(listen_fd);
         listen_fd = -1;
-        if (hgame)
+        if (hgame && !hgame->over)      /* (after the end nobody "leaves") */
             for (int p = 0; p < hgame->nplayers; p++)
                 if (seat_remote[p]) game_player_leaves(hgame, p);
         for (int p = 0; p < MAXPLAYERS; p++) { seat_conn[p] = -1; seat_away_until[p] = 0; }

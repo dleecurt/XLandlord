@@ -48,6 +48,7 @@
 #include "app.h"
 #include "guide.h"
 #include "splash.h"
+#include "server.h"
 #include "help.h"
 #include "human.h"
 #include "keys.h"
@@ -491,6 +492,9 @@ static void act_propose(int p)
     last_human = -2;                            /* other humans voted: say whose turn it is again */
 }
 
+/* See app.h. */
+int app_host_action(Game *g, int p, const NetMsg *m) { return host_action(g, p, m); }
+
 /* A joiner's ACTION, at the host (net.c calls it during the joiner's turn). */
 static int host_action(Game *g, int p, const NetMsg *m)
 {
@@ -509,8 +513,7 @@ static int host_action(Game *g, int p, const NetMsg *m)
     case NX_PROPOSE:    act_propose(p); break;
     default: break;
     }
-    view_draw();
-    xw_flush();
+    if (!app.headless) { view_draw(); xw_flush(); }
     (void)g;
     return 0;
 }
@@ -988,6 +991,23 @@ int main(int argc, char **argv)
     if (argc == 3 && !strcmp(argv[1], "--relay")) return net_relay(atoi(argv[2]));
     StartMode mode = START_ASK;
     const char *join_host = NULL;
+    /* --server: host games with no window (server.c); its options take
+     * their defaults from the preferences. */
+    int server = 0;
+    for (int i = 1; i < argc; i++) if (!strcmp(argv[i], "--server")) server = 1;
+    if (server) {
+        prefs_load(&app.prefs);
+        ServerOptions so;
+        server_defaults(&so, &app.prefs);
+        for (int i = 1; i < argc; i++) {
+            if (!strcmp(argv[i], "--server")) continue;
+            int used = server_parse(argc, argv, i, &so);
+            if (used < 0) return 2;
+            if (used == 0) { fprintf(stderr, "XLandlord: %s cannot be used with --server (try --help)\n", argv[i]); return 2; }
+            i += used - 1;
+        }
+        return server_run(&so);
+    }
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--host")) { mode = START_HOST; continue; }
         if (!strcmp(argv[i], "--local")) { mode = START_LOCAL; continue; }
@@ -1003,6 +1023,9 @@ int main(int argc, char **argv)
         }
         if (!strcmp(argv[i], "--help") || !strcmp(argv[i], "-h")) {
             printf("usage: XLandlord [--host | --join [USER@]HOST[:PORT] | --local]\n"
+                   "       XLandlord --server [--port N] [--skill easy|medium|hard] [--wages 3|5|7|10]\n"
+                   "                 [--advanced | --standard] [--reconnect MIN] [--answer MIN]\n"
+                   "                 [--start-wait SECS] [--name NAME]\n"
                    "       XLandlord --version | --help\n"
                    "       XLandlord --relay PORT   (run by ssh for network play; not by hand)\n"
                    "\n"
@@ -1011,6 +1034,11 @@ int main(int argc, char **argv)
                    "             in DNS or /etc/hosts; [IPv6]:port for IPv6 with a port\n"
                    "  --local    play at this screen (against the computer, or hot-seat)\n"
                    "  With none of these, the game asks at start-up.\n"
+                   "  --server   host games with no window, one after another, until Ctrl+C:\n"
+                   "             up to four join; a game starts when four are in, or SECS (60)\n"
+                   "             after the latest arrival. The record of events is printed and\n"
+                   "             written to ~/log/xlandlord-DATE-TIME.log, a file per game.\n"
+                   "             Other settings default to the preferences.\n"
                    "The Landlord's Game (Lizzie J. Magie, 1904) against the computer, for X11.\n"
                    "Settings are kept in ~/.config/xlandlord/preferences.conf.\n");
             return 0;

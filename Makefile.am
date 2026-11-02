@@ -55,6 +55,7 @@ XLandlord_SOURCES = \
 	src/menubar.c \
 	src/netui.c \
 	src/prefs.c \
+	src/server.c \
 	src/splash.c \
 	src/ui.c \
 	src/view.c \
@@ -66,6 +67,7 @@ noinst_HEADERS = \
 	src/app.h \
 	src/guide.h \
 	src/guidepics.h \
+	src/server.h \
 	src/splash.h \
 	src/art.h \
 	src/board.h \
@@ -217,7 +219,8 @@ install-data-hook:
 # tests/net checks the network protocol's message format and that seats
 # left for absent network players are played by the computer.
 check_PROGRAMS = tests/engine tests/net
-TESTS = tests/engine tests/net
+TESTS = tests/engine tests/net tests/server.sh
+EXTRA_DIST += tests/server.sh
 tests_engine_SOURCES = tests/engine.c $(CORE_SOURCES)
 tests_engine_CFLAGS = $(WARN_CFLAGS) -I$(top_srcdir)/src
 tests_net_SOURCES = tests/net.c $(CORE_SOURCES)

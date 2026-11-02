@@ -17,6 +17,23 @@ XLandlord \- The Landlord's Game (Lizzie J. Magie, 1904) for X11, against the co
 .RI [ user\fB@\fP] host [\fB:\fP port ]
 .RB " | " \-\-local ]
 .br
+.B XLandlord \-\-server
+.RB [ \-\-port
+.IR n ]
+.RB [ \-\-skill
+.IR level ]
+.RB [ \-\-wages
+.IR n ]
+.RB [ \-\-advanced " | " \-\-standard ]
+.RB [ \-\-reconnect
+.IR min ]
+.RB [ \-\-answer
+.IR min ]
+.RB [ \-\-start\-wait
+.IR secs ]
+.RB [ \-\-name
+.IR name ]
+.br
 .B XLandlord
 .BR \-\-version " | " \-\-help
 .br
@@ -95,6 +112,11 @@ Play at this screen, against the computer or with others taking turns.
 .TP
 .B \-\-version
 Print the version and exit.
+.TP
+.B \-\-server
+Run as a server: host games with no window, one after another, until
+stopped. See
+.BR "SERVER MODE" .
 .TP
 .B \-\-help
 Print a short usage message and exit.
@@ -365,6 +387,83 @@ long, he can also remove him at once.
 Nobody else can take over a game, so if the host leaves, the game is over
 for everyone: each joiner is told, whether the host ended it or his game
 simply stopped.
+.\" ------------------------------------------------------------------
+.SH SERVER MODE
+.B XLandlord \-\-server
+hosts network games with no window and no X display, so it can run on a
+machine without a screen or in an ssh session. It never plays: as in
+.BR "Host Only" ,
+all four seats are for players who join (with
+.B Join a Network Game
+and the server machine's address, exactly as for any host), and the
+computer player takes a free seat.
+.PP
+A game starts as soon as four players have joined, or
+.I secs
+seconds (60 unless
+.B \-\-start\-wait
+says otherwise) after the latest arrival, if at least one has joined.
+When a game ends the server opens a new table and waits again, game after
+game, until it is stopped with Ctrl+C or
+.BR SIGTERM ;
+then the players of a game under way are told that the server is shutting
+down.
+.PP
+Everything that happens is printed to standard output, each line with the
+time: players joining, being turned away, dropping and coming back, every
+line of the record of events, and the final standings. The same lines go
+to a log file, one per game, in
+.IR ~/log/ ,
+named
+.IR xlandlord\-YYYY\-MM\-DD\-HHMM.log
+(with
+.IR \-2 ,
+.IR \-3 ...
+when several games start in one minute); the directory is made if it is
+missing.
+.PP
+With nobody at the server to press Remove, only the timers take out a
+player who has gone or stopped answering. The options, each defaulting to
+the preferences:
+.TP
+.BI \-\-port " n"
+the port to listen on (127.0.0.1 only; players come through ssh).
+.TP
+.BI \-\-skill " level"
+the computer player's skill:
+.BR easy ,
+.B medium
+or
+.BR hard .
+.TP
+.BI \-\-wages " n"
+the game ends at
+.I n
+wages: 3, 5, 7 or 10.
+.TP
+.BR \-\-advanced " / " \-\-standard
+the rules.
+.TP
+.BI \-\-reconnect " min"
+minutes a dropped player has to come back: 1, 2 or 5.
+.TP
+.BI \-\-answer " min"
+minutes to answer before "Are you still there?": 1, 2 or 5.
+.TP
+.BI \-\-start\-wait " secs"
+seconds after the latest arrival before a game starts (5 to 3600; 60).
+.TP
+.BI \-\-name " name"
+the host's name shown in the waiting rooms (default
+.IR "XLandlord server" ).
+.PP
+For example, to keep a server running after logging out:
+.PP
+.RS
+.nf
+nohup XLandlord \-\-server \-\-skill hard \-\-wages 7 > /dev/null &
+.fi
+.RE
 .\" ------------------------------------------------------------------
 .SH CONFIGURATION
 The game's settings are kept in
@@ -784,6 +883,10 @@ hurries them along.
 .I ~/.config/xlandlord/preferences.conf
 The preferences (see
 .BR CONFIGURATION ).
+.TP
+.I ~/log/xlandlord\-YYYY\-MM\-DD\-HHMM.log
+In server mode, the log of each game (see
+.BR "SERVER MODE" ).
 .TP
 .I /usr/local/share/doc/xlandlord/
 The rule book

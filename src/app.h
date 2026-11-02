@@ -24,6 +24,7 @@
 
 #include "game.h"
 #include "prefs.h"
+#include "net.h"
 
 typedef struct {
     Game game;
@@ -34,6 +35,7 @@ typedef struct {
     int highlight;          /* a space to outline on the board, or -1 */
     int dice_rolling;       /* the dice are tumbling (drawn without numbers) */
     int me;                 /* network joiner: my player number */
+    int headless;           /* XLandlord --server: no window, so nothing is drawn */
 } App;
 
 extern App app;
@@ -46,6 +48,10 @@ int app_confirm_on(void);
 
 /* The humans who share this screen (1 for a network joiner). */
 int app_local_humans(void);
+
+/* What the host does with a joiner's ACTION (net_set_action_handler):
+ * shared by the windowed host and the server. */
+int app_host_action(Game *g, int p, const NetMsg *m);
 
 /* The color of player p's checker and houses. */
 int app_player_color(int p);

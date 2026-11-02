@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.0.16 - 2026-11-02
+
+- **Server mode**: `XLandlord --server` hosts games with no window and no X
+  display. It never plays: all four seats are for joiners (as in Host
+  Only), the computer player taking a free seat. A game starts as soon as
+  four have joined, or 60 seconds after the latest arrival if at least one
+  has (`--start-wait SECS`). When it ends a new table opens, game after
+  game, until Ctrl+C or SIGTERM, which tells the players of a game under way
+  that the server is shutting down.
+- Everything the server sees - joins, refusals, drops and returns, every
+  line of the record of events, the final standings - is printed to the
+  console with the time, and written to a log file per game,
+  `~/log/xlandlord-YYYY-MM-DD-HHMM.log` (`-2`, `-3`... if several start in
+  one minute; the directory is made if missing).
+- Server options, defaulting to the preferences: `--port`, `--skill`,
+  `--wages`, `--advanced` / `--standard`, `--reconnect`, `--answer`,
+  `--start-wait`, `--name`.
+- Fix: a player kept busy in a dialog while many messages arrived could
+  lose them all (the receive buffer was emptied when it filled up), among
+  them the host's goodbye. Now a full buffer is emptied only when it holds
+  one absurdly long line.
+- Fix: after a game had ended, closing the table recorded the players as
+  leaving it.
+- `make check` runs tests/server.sh: the server starts with no display,
+  writes its console and log lines, and stops on SIGTERM.
+- The man page has a SERVER MODE section; README, INSTALL, the rule book
+  and Help > Network Play describe it.
+
 ## 0.0.15 - 2026-11-02
 
 - Hosting has a new first choice: **Host and Play** (as before: the host

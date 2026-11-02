@@ -69,7 +69,7 @@ arrow keys) turn the pages.
 
 Without the 75dpi fonts the game still runs; X picks the nearest fonts it has.
 
-Current version: **0.0.15** (see `CHANGELOG.md`).
+Current version: **0.0.16** (see `CHANGELOG.md`).
 
 ## Playing
 
@@ -215,6 +215,27 @@ The host runs the only real game; joiners draw what it sends and answer its
 questions. `BatchMode=yes` means ssh will never stop to ask for a password, so
 **password-less (key) access is required**. The protocol is described in
 `src/net.h`.
+
+**Server mode.** `XLandlord --server` hosts games with no window and no X
+display - on a machine without a screen, or in a plain ssh session. It never
+plays: all four seats are for joiners (as in Host Only), with the computer
+player in a free seat. A game starts as soon as four have joined, or 60
+seconds after the latest arrival if at least one has (`--start-wait SECS`).
+When it ends, the server opens a new table, game after game, until Ctrl+C
+(or `SIGTERM`), which tells the players of a game under way that the server
+is shutting down. Everything that happens - joins, refusals, drops, every
+line of the record of events, the final standings - is printed with the
+time and written to a log file per game,
+`~/log/xlandlord-YYYY-MM-DD-HHMM.log` (the directory is made if missing).
+The game's settings default to the preferences and can be given on the
+command line:
+
+```
+XLandlord --server --port 1904 --skill hard --wages 7 --advanced \
+          --reconnect 2 --answer 2 --start-wait 60 --name "Lee's server"
+```
+
+To keep it running after you log out: `nohup XLandlord --server > /dev/null &`.
 
 #### Setting up password-less ssh
 
@@ -409,6 +430,7 @@ Only public-domain material or art made for this program is used:
 | `src/guidepics.c` | its screenshots, compiled in (made by `make guide-pics`) |
 | `src/prefs.c` | the preferences file |
 | `src/splash.c` | the title card at start-up, with the first question |
+| `src/server.c` | `--server`: hosting with no window, game after game, the console and the log |
 | `src/main.c` | start-up (how to play, then the player's name), the main loop, the commands |
 | `XLandlord.6.in` | the manual page |
 | `docs/RULES.md` | the rule book and how-to-play guide (source of the PDF) |
@@ -416,6 +438,7 @@ Only public-domain material or art made for this program is used:
 | `docs/guide/*.png` | the guide's screenshots, the source of `src/guidepics.c` |
 | `docs/guidepics.c` | turns them into `src/guidepics.c` |
 | `tests/engine.c` | `make check`: computer-only games, consistency checks, a player leaving mid-game |
+| `tests/server.sh` | `make check`: `--server` starts with no display, logs to `~/log/`, stops on SIGTERM |
 | `tests/net.c` | `make check`: network games end to end through a stand-in for ssh (table limit, no computer player with four humans, quitting, reconnecting, a player who stops answering, names taken, host-only games) |
 
 ## License
